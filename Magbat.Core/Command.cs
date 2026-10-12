@@ -6,5 +6,14 @@ namespace Magbat.Core
     public abstract class Command
     {
         public int Player { get; set; }
+
+        protected Command()
+        {
+        }
+
+        protected Command(int player)
+        {
+            Player = player;
+        }
     }
 }

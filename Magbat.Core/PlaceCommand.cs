@@ -8,5 +8,24 @@ namespace Magbat.Core
         public string PieceName { get; set; } = string.Empty;
         public int X { get; set; }
         public int Y { get; set; }
+        
+        public PlaceCommand(int player, string pieceName, int x, int y) : base(player)
+        {
+            PieceName = pieceName;
+            X = x;
+            Y = y;
+        }
+
+        public PlaceCommand()
+        {
+            PieceName = string.Empty;
+            X = -1;
+            Y = -1;
+        }
+
+        public override string ToString()
+        {
+            return $"Player {Player}: place {PieceName} to ({X}, {Y})";
+        }
     }
 }
