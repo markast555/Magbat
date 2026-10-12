@@ -5,6 +5,7 @@ namespace Magbat.Core
     /// </summary>
     public class PieceDefinition
     {
+        public string Name { get; }
         public PieceType Type { get; }
         /// <summary>
         /// Базовое значение ХП
@@ -17,9 +18,9 @@ namespace Magbat.Core
         public int MoveRange { get; }
         public int AttackRange { get; }
 
-        public PieceDefinition(PieceType type, int defHp, int defDamage, int moveRange, int attackRange)
+        public PieceDefinition(string name, PieceType type, int defHp, int defDamage, int moveRange, int attackRange)
         {
-            Type = type; DefHp = defHp; DefDamage = defDamage;
+            Name = name; Type = type; DefHp = defHp; DefDamage = defDamage;
             MoveRange = moveRange; AttackRange = attackRange;
         }
     }

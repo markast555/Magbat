@@ -5,7 +5,7 @@ namespace Magbat.Core
     /// </summary>
     public class PlaceCommand : Command
     {
-        public PieceType Type { get; set; }
+        public string PieceName { get; set; } = string.Empty;
         public int X { get; set; }
         public int Y { get; set; }
     }
