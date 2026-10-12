@@ -7,7 +7,7 @@ namespace Magbat.Core
     /// </summary>
     public class GameField
     {
-        private readonly Piece[,] _cells;
+        private readonly Piece?[,] _cells;
         public int Width { get; }
         public int Height { get; }
 
@@ -19,7 +19,7 @@ namespace Magbat.Core
         }
 
         public bool InBounds(int x, int y) => x >= 0 && y >= 0 && x < Width && y < Height;
-        public Piece GetAt(int x, int y) => _cells[x, y];
+        public Piece? GetAt(int x, int y) => _cells[x, y];
         public bool IsEmpty(int x, int y) => _cells[x, y] == null;
 
         public void Put(Piece piece) => _cells[piece.X, piece.Y] = piece;

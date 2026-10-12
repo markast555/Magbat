@@ -6,6 +6,6 @@ namespace Magbat.Core
     public class ApplyResult
     {
         public bool Success { get; set; }
-        public string Error { get; set; }
+        public string? Error { get; set; }
     }
 }
