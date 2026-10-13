@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace Magbat.Core
 {
@@ -132,7 +133,53 @@ namespace Magbat.Core
 
         public List<Command> GetLegalCommands(GameState state)
         {
-            return new List<Command>();
+            var commands = new List<Command>();
+            if (state.Winner != null)
+                return commands;
+
+            int player = state.CurrentPlayer;
+            var field = state.Field;
+            var own = GetPieces(state, player);
+            var enemies = GetPieces(state, 1 - player);
+
+            // выставление: каждое название из руки на каждую свободную клетку
+            foreach (var name in state.Hands[player].Distinct())
+                for (int x = 0; x < field.Width; x++)
+                for (int y = 0; y < field.Height; y++)
+                    if (field.IsEmpty(x, y))
+                        commands.Add(new PlaceCommand(player, name, x, y));
+
+            foreach (var piece in own)
+            {
+                // перемещение: свободные клетки в пределах дальности хода
+                int range = piece.Definition.MoveRange;
+                for (int x = Math.Max(0, piece.X - range); x <= Math.Min(field.Width - 1, piece.X + range); x++)
+                for (int y = Math.Max(0, piece.Y - range); y <= Math.Min(field.Height - 1, piece.Y + range); y++)
+                    if (field.IsEmpty(x, y))
+                        commands.Add(new MoveCommand(player, piece.Id, x, y));
+
+                // атака: вражеские фигуры в пределах дальности атаки
+                foreach (var enemy in enemies)
+                    if (GameField.Distance(piece.X, piece.Y, enemy.X, enemy.Y) <= piece.Definition.AttackRange)
+                        commands.Add(new AttackCommand(player, piece.Id, enemy.Id));
+            }
+
+            commands.Add(new PassCommand(player));
+            return commands;
+        }
+        
+        private List<Piece> GetPieces(GameState state, int owner)
+        {
+            var result = new List<Piece>();
+            var field = state.Field;
+            for (int x = 0; x < field.Width; x++)
+            for (int y = 0; y < field.Height; y++)
+            {
+                var piece = field.GetAt(x, y);
+                if (piece != null && piece.Owner == owner)
+                    result.Add(piece);
+            }
+            return result;
         }
     }
 }
