@@ -37,6 +37,9 @@ namespace Magbat.Core
             if (result.Success && !(command is PassCommand))
                 state.ConsecutivePasses[command.Player] = 0;
             
+            if (result.Success && state.Winner == null)
+                state.CurrentPlayer = 1 - state.CurrentPlayer;
+            
             return result;
         }
         
