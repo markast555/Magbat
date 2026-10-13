@@ -11,6 +11,12 @@ namespace Magbat.Core
     {
         public const int MaxConsecutivePasses = 3;
         
+        /// <summary>
+        /// Применяет поступившую команду и изменяет состояние игры
+        /// </summary>
+        /// <param name="state">Текущее состояние игры</param>
+        /// <param name="command">Поступившая команда</param>
+        /// <returns>Результат применения: успех или причина отказа</returns>
         public ApplyResult Apply(GameState state, Command command)
         {
             if (state.Winner != null)
@@ -30,10 +36,16 @@ namespace Magbat.Core
 
             if (result.Success && !(command is PassCommand))
                 state.ConsecutivePasses[command.Player] = 0;
-
+            
             return result;
         }
         
+        /// <summary>
+        /// Применяет команду выставления фигуры на поле
+        /// </summary>
+        /// <param name="state">Текущее состояние игры</param>
+        /// <param name="cmd">Команда выставления фигуры</param>
+        /// <returns>Результат применения</returns>
         private ApplyResult ApplyPlace(GameState state, PlaceCommand cmd)
         {
             var field = state.Field;
@@ -53,6 +65,12 @@ namespace Magbat.Core
             return ApplyResult.Ok();
         }
         
+        /// <summary>
+        /// Применяет команду перемещения фигуры
+        /// </summary>
+        /// <param name="state">Текущее состояние игры</param>
+        /// <param name="cmd">Команда перемещения фигуры</param>
+        /// <returns>Результат применения</returns>
         private ApplyResult ApplyMove(GameState state, MoveCommand cmd)
         {
             var field = state.Field;
@@ -75,6 +93,12 @@ namespace Magbat.Core
             return ApplyResult.Ok();
         }
         
+        /// <summary>
+        /// Применяет команду атаки фигуры
+        /// </summary>
+        /// <param name="state">Текущее состояние игры</param>
+        /// <param name="cmd">Команда атаки фигуры</param>
+        /// <returns>Результат применения</returns>
         private ApplyResult ApplyAttack(GameState state, AttackCommand cmd)
         {
             var attacker = FindPiece(state, cmd.AttackerId);
@@ -98,6 +122,12 @@ namespace Magbat.Core
             return ApplyResult.Ok();
         }
 
+        /// <summary>
+        /// Применяет команду пропуска хода
+        /// </summary>
+        /// <param name="state">Текущее состояние игры</param>
+        /// <param name="cmd">Команда пропуска хода</param>
+        /// <returns>Результат применения</returns>
         private ApplyResult ApplyPass(GameState state, PassCommand cmd)
         {
             state.ConsecutivePasses[cmd.Player]++;
@@ -106,6 +136,12 @@ namespace Magbat.Core
             return ApplyResult.Ok();
         }
         
+        /// <summary>
+        /// Ищет обозначенную фигуру на поле
+        /// </summary>
+        /// <param name="state">Текущее состояние игры</param>
+        /// <param name="id">ID искомой фигуры</param>
+        /// <returns>Найденная фигура или null, если такой нет</returns>
         private Piece? FindPiece(GameState state, int id)
         {
             var field = state.Field;
@@ -118,6 +154,12 @@ namespace Magbat.Core
             return null;
         }
         
+        /// <summary>
+        /// Считает фигуры игрока на поле
+        /// </summary>
+        /// <param name="state">Текущее состояние игры</param>
+        /// <param name="owner">Владелец</param>
+        /// <returns>Количество найденных фигур</returns>
         private int CountPieces(GameState state, int owner)
         {
             int count = 0;
@@ -131,6 +173,11 @@ namespace Magbat.Core
             return count;
         }
 
+        /// <summary>
+        /// Возвращает список всех доступных команд
+        /// </summary>
+        /// <param name="state">Текущее состояние игры</param>
+        /// <returns>Список доступных команд</returns>
         public List<Command> GetLegalCommands(GameState state)
         {
             var commands = new List<Command>();
@@ -168,6 +215,12 @@ namespace Magbat.Core
             return commands;
         }
         
+        /// <summary>
+        /// Даёт список выставленных фигур
+        /// </summary>
+        /// <param name="state">Текущее состояние игры</param>
+        /// <param name="owner">Владелец</param>
+        /// <returns>Список выставленных фигур</returns>
         private List<Piece> GetPieces(GameState state, int owner)
         {
             var result = new List<Piece>();
