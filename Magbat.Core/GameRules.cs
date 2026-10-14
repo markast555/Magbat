@@ -20,9 +20,9 @@ namespace Magbat.Core
         public ApplyResult Apply(GameState state, Command command)
         {
             if (state.Winner != null)
-                return ApplyResult.Fail("Game is over");
+                return ApplyResult.Fail(ApplyError.GameOver);
             if (command.Player != state.CurrentPlayer)
-                return ApplyResult.Fail("Not your turn");
+                return ApplyResult.Fail(ApplyError.NotYourTurn);
 
             ApplyResult result;
             switch (command)
@@ -31,7 +31,7 @@ namespace Magbat.Core
                 case MoveCommand move:     result = ApplyMove(state, move); break;
                 case AttackCommand attack: result = ApplyAttack(state, attack); break;
                 case PassCommand pass:     result = ApplyPass(state, pass); break;
-                default: return ApplyResult.Fail("Unknown command");
+                default: return ApplyResult.Fail(ApplyError.UnknownCommand);
             }
 
             if (result.Success && !(command is PassCommand))
@@ -55,11 +55,11 @@ namespace Magbat.Core
             var hand = state.Hands[cmd.Player];
 
             if (!hand.Contains(cmd.PieceName))
-                return ApplyResult.Fail("Piece is not in hand");
+                return ApplyResult.Fail(ApplyError.PieceNotInHand);
             if (!field.InBounds(cmd.X, cmd.Y))
-                return ApplyResult.Fail("Cell is out of bounds");
+                return ApplyResult.Fail(ApplyError.OutOfBounds);
             if (!field.IsEmpty(cmd.X, cmd.Y))
-                return ApplyResult.Fail("Cell is occupied");
+                return ApplyResult.Fail(ApplyError.CellOccupied);
 
             var definition = PieceCatalog.Get(cmd.PieceName);
             var piece = new Piece(state.NextPieceId++, cmd.Player, definition, cmd.X, cmd.Y);
@@ -79,15 +79,15 @@ namespace Magbat.Core
             var field = state.Field;
             var piece = FindPiece(state, cmd.PieceId);
             if (piece == null || piece.Owner != cmd.Player)
-                return ApplyResult.Fail("No such piece of yours");
+                return ApplyResult.Fail(ApplyError.NoSuchPiece);
             if (!field.InBounds(cmd.ToX, cmd.ToY))
-                return ApplyResult.Fail("Cell is out of bounds");
+                return ApplyResult.Fail(ApplyError.OutOfBounds);
             if (!field.IsEmpty(cmd.ToX, cmd.ToY))
-                return ApplyResult.Fail("Cell is occupied");
+                return ApplyResult.Fail(ApplyError.CellOccupied);
 
             int distance = GameField.Distance(piece.X, piece.Y, cmd.ToX, cmd.ToY);
             if (distance == 0 || distance > piece.Definition.MoveRange)
-                return ApplyResult.Fail("Too far");
+                return ApplyResult.Fail(ApplyError.TooFar);
 
             field.Remove(piece.X, piece.Y);
             piece.X = cmd.ToX;
@@ -107,13 +107,13 @@ namespace Magbat.Core
             var attacker = FindPiece(state, cmd.AttackerId);
             var target = FindPiece(state, cmd.TargetId);
             if (attacker == null || attacker.Owner != cmd.Player)
-                return ApplyResult.Fail("No such attacker of yours");
+                return ApplyResult.Fail(ApplyError.NoSuchPiece);
             if (target == null || target.Owner == cmd.Player)
-                return ApplyResult.Fail("Invalid target");
+                return ApplyResult.Fail(ApplyError.InvalidTarget);
 
             int distance = GameField.Distance(attacker.X, attacker.Y, target.X, target.Y);
             if (distance > attacker.Definition.AttackRange)
-                return ApplyResult.Fail("Target out of range");
+                return ApplyResult.Fail(ApplyError.TargetOutOfRange);
 
             target.Hp -= attacker.Definition.DefDamage;
             if (target.Hp <= 0)

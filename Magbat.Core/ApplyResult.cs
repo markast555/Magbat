@@ -5,10 +5,12 @@ namespace Magbat.Core
     /// </summary>
     public class ApplyResult
     {
-        public bool Success { get; set; }
-        public string? Error { get; set; }
+        public ApplyError Error { get; private set; }
+        public bool Success => Error == ApplyError.None;
 
-        public static ApplyResult Ok() => new ApplyResult { Success = true };
-        public static ApplyResult Fail(string error) => new ApplyResult { Success = false, Error = error };
+        private ApplyResult() { }
+
+        public static ApplyResult Ok() => new ApplyResult();
+        public static ApplyResult Fail(ApplyError error) => new ApplyResult { Error = error };
     }
 }
