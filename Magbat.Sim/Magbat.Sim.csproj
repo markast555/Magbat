@@ -7,4 +7,8 @@
         <Nullable>enable</Nullable>
     </PropertyGroup>
 
+    <ItemGroup>
+      <ProjectReference Include="..\Magbat.Core\Magbat.Core.csproj" />
+    </ItemGroup>
+
 </Project>
