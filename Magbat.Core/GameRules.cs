@@ -34,12 +34,18 @@ namespace Magbat.Core
                 default: return ApplyResult.Fail(ApplyError.UnknownCommand);
             }
 
-            if (result.Success && !(command is PassCommand))
+            if (!result.Success)
+                return result;
+
+            if (!(command is PassCommand))
                 state.ConsecutivePasses[command.Player] = 0;
-            
-            if (result.Success && state.Winner == null)
+
+            if (state.Winner == null)
+            {
                 state.CurrentPlayer = 1 - state.CurrentPlayer;
-            
+                result.Changes.Add(new TurnChanged(state.CurrentPlayer));
+            }
+
             return result;
         }
         
@@ -65,7 +71,10 @@ namespace Magbat.Core
             var piece = new Piece(state.NextPieceId++, cmd.Player, definition, cmd.X, cmd.Y);
             field.Put(piece);
             hand.Remove(cmd.PieceName);
-            return ApplyResult.Ok();
+
+            var result = ApplyResult.Ok();
+            result.Changes.Add(new PieceAdded(piece.Id, piece.Owner, cmd.PieceName, piece.X, piece.Y));
+            return result;
         }
         
         /// <summary>
@@ -77,7 +86,7 @@ namespace Magbat.Core
         private ApplyResult ApplyMove(GameState state, MoveCommand cmd)
         {
             var field = state.Field;
-            var piece = FindPiece(state, cmd.PieceId);
+            var piece = field.FindById(cmd.PieceId);
             if (piece == null || piece.Owner != cmd.Player)
                 return ApplyResult.Fail(ApplyError.NoSuchPiece);
             if (!field.InBounds(cmd.ToX, cmd.ToY))
@@ -93,8 +102,12 @@ namespace Magbat.Core
             piece.X = cmd.ToX;
             piece.Y = cmd.ToY;
             field.Put(piece);
-            return ApplyResult.Ok();
+
+            var result = ApplyResult.Ok();
+            result.Changes.Add(new PieceMoved(piece.Id, cmd.ToX, cmd.ToY));
+            return result;
         }
+
         
         /// <summary>
         /// Применяет команду атаки фигуры
@@ -104,8 +117,8 @@ namespace Magbat.Core
         /// <returns>Результат применения</returns>
         private ApplyResult ApplyAttack(GameState state, AttackCommand cmd)
         {
-            var attacker = FindPiece(state, cmd.AttackerId);
-            var target = FindPiece(state, cmd.TargetId);
+            var attacker = state.Field.FindById(cmd.AttackerId);
+            var target = state.Field.FindById(cmd.TargetId);
             if (attacker == null || attacker.Owner != cmd.Player)
                 return ApplyResult.Fail(ApplyError.NoSuchPiece);
             if (target == null || target.Owner == cmd.Player)
@@ -115,14 +128,24 @@ namespace Magbat.Core
             if (distance > attacker.Definition.AttackRange)
                 return ApplyResult.Fail(ApplyError.TargetOutOfRange);
 
+            var result = ApplyResult.Ok();
             target.Hp -= attacker.Definition.DefDamage;
             if (target.Hp <= 0)
             {
                 state.Field.Remove(target.X, target.Y);
+                result.Changes.Add(new PieceRemoved(target.Id));
+
                 if (CountPieces(state, target.Owner) == 0 && state.Hands[target.Owner].Count == 0)
+                {
                     state.Winner = cmd.Player;
+                    result.Changes.Add(new GameEnded(cmd.Player));
+                }
             }
-            return ApplyResult.Ok();
+            else
+            {
+                result.Changes.Add(new PieceDamaged(target.Id, target.Hp));
+            }
+            return result;
         }
 
         /// <summary>
@@ -133,28 +156,14 @@ namespace Magbat.Core
         /// <returns>Результат применения</returns>
         private ApplyResult ApplyPass(GameState state, PassCommand cmd)
         {
+            var result = ApplyResult.Ok();
             state.ConsecutivePasses[cmd.Player]++;
             if (state.ConsecutivePasses[cmd.Player] >= MaxConsecutivePasses)
-                state.Winner = 1 - cmd.Player;
-            return ApplyResult.Ok();
-        }
-        
-        /// <summary>
-        /// Ищет обозначенную фигуру на поле
-        /// </summary>
-        /// <param name="state">Текущее состояние игры</param>
-        /// <param name="id">ID искомой фигуры</param>
-        /// <returns>Найденная фигура или null, если такой нет</returns>
-        private Piece? FindPiece(GameState state, int id)
-        {
-            var field = state.Field;
-            for (int x = 0; x < field.Width; x++)
-            for (int y = 0; y < field.Height; y++)
             {
-                var piece = field.GetAt(x, y);
-                if (piece != null && piece.Id == id) return piece;
+                state.Winner = 1 - cmd.Player;
+                result.Changes.Add(new GameEnded(1 - cmd.Player));
             }
-            return null;
+            return result;
         }
         
         /// <summary>

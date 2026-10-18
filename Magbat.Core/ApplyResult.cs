@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 namespace Magbat.Core
 {
     /// <summary>
@@ -7,6 +9,7 @@ namespace Magbat.Core
     {
         public ApplyError Error { get; private set; }
         public bool Success => Error == ApplyError.None;
+        public List<Change> Changes { get; } = new List<Change>();
 
         private ApplyResult() { }
 

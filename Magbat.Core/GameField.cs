@@ -27,5 +27,21 @@ namespace Magbat.Core
 
         public static int Distance(int x1, int y1, int x2, int y2)
             => Math.Max(Math.Abs(x1 - x2), Math.Abs(y1 - y2));
+        
+        /// <summary>
+        /// Ищет обозначенную фигуру на поле
+        /// </summary>
+        /// <param name="id">ID искомой фигуры</param>
+        /// <returns>Найденная фигура или null, если такой нет</returns>
+        public Piece? FindById(int id)
+        {
+            for (int x = 0; x < Width; x++)
+            for (int y = 0; y < Height; y++)
+            {
+                var piece = _cells[x, y];
+                if (piece != null && piece.Id == id) return piece;
+            }
+            return null;
+        }
     }
 }
