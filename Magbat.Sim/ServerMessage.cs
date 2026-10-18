@@ -5,17 +5,17 @@ namespace Magbat.Sim;
 public class ServerMessage
 {
     public int GameId { get; }
-    public Command Command { get; }
+    public int Player { get; }          // кто отправил исходную команду
+    public long CommandSentAt { get; }  // время её отправки: от него клиент считает задержку
     public ApplyError Error { get; }
-    public int? Winner { get; }
-    public long CommandSentAt { get; } // время отправки исходной команды: от него считается задержка
+    public IReadOnlyList<Change> Changes { get; }
 
-    public ServerMessage(int gameId, Command command, ApplyError error, int? winner, long commandSentAt)
+    public ServerMessage(int gameId, int player, long commandSentAt, ApplyError error, IReadOnlyList<Change> changes)
     {
         GameId = gameId;
-        Command = command;
-        Error = error;
-        Winner = winner;
+        Player = player;
         CommandSentAt = commandSentAt;
+        Error = error;
+        Changes = changes;
     }
 }
