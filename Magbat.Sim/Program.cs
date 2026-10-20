@@ -1,5 +1,6 @@
 ﻿using Magbat.Core;
 using Magbat.Sim;
+using System.Diagnostics;
 
 var rules = new GameRules();
 
@@ -21,3 +22,9 @@ for (int seed = 1; seed <= 1000; seed++)
     if (result.HitTurnLimit) limit++; else won++;
 }
 Console.WriteLine($"Finished with winner: {won}, hit turn limit: {limit}, average turns: {totalTurns / 1000.0:F1}");
+
+using var simulation = new GameSimulation(new EventServer(rules), rules, delayMs: 0);
+var watch = Stopwatch.StartNew();
+var simulationResult = simulation.Run(Enumerable.Range(1, 1000).ToList(), TimeSpan.FromMinutes(2));
+Console.WriteLine($"EventServer: {simulationResult.ServerStates.Count} games in {watch.Elapsed.TotalSeconds:F1} s, " +
+                  $"average latency {simulationResult.LatenciesMs.Average():F3} ms");
