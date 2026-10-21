@@ -21,7 +21,12 @@ namespace Magbat.Core
             Register(new PieceDefinition("Cannon_Three",  PieceType.Cannon,   7, 8, 0, 3));
         }
 
-        private static void Register(PieceDefinition definition)
+        /// <summary>
+        /// Регистрирует определение фигуры. Позволяет внешним библиотекам
+        /// добавлять фигуры со способностями.
+        /// </summary>
+        /// <param name="definition">Определение фигуры</param>
+        public static void Register(PieceDefinition definition)
         {
             _definitions.Add(definition.Name, definition);
         }

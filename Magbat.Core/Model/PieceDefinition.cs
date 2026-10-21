@@ -1,3 +1,6 @@
+using System;
+using Magbat.Core.Abilities;
+
 namespace Magbat.Core
 {
     /// <summary>
@@ -18,10 +21,19 @@ namespace Magbat.Core
         public int MoveRange { get; }
         public int AttackRange { get; }
 
-        public PieceDefinition(string name, PieceType type, int defHp, int defDamage, int moveRange, int attackRange)
+        /// <summary>
+        /// Фабрика способностей фигуры. Вызывается один раз на каждый экземпляр фигуры,
+        /// поэтому каждая фигура получает собственные экземпляры способностей.
+        /// null означает, что у фигуры нет способностей.
+        /// </summary>
+        public Func<Piece, IAbility>? AbilityFactory { get; }
+
+        public PieceDefinition(string name, PieceType type, int defHp, int defDamage, int moveRange, int attackRange,
+            Func<Piece, IAbility>? abilityFactory = null)
         {
             Name = name; Type = type; DefHp = defHp; DefDamage = defDamage;
             MoveRange = moveRange; AttackRange = attackRange;
+            AbilityFactory = abilityFactory;
         }
     }
 }

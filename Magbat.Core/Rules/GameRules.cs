@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Magbat.Core.Abilities;
 
 namespace Magbat.Core
 {
@@ -94,7 +95,7 @@ namespace Magbat.Core
             if (!field.IsEmpty(cmd.ToX, cmd.ToY))
                 return ApplyResult.Fail(ApplyError.CellOccupied);
 
-            int distance = GameField.Distance(piece.X, piece.Y, cmd.ToX, cmd.ToY);
+            int distance = field.GetDistance(piece.X, piece.Y, cmd.ToX, cmd.ToY);
             if (distance == 0 || distance > piece.Definition.MoveRange)
                 return ApplyResult.Fail(ApplyError.TooFar);
 
@@ -124,12 +125,12 @@ namespace Magbat.Core
             if (target == null || target.Owner == cmd.Player)
                 return ApplyResult.Fail(ApplyError.InvalidTarget);
 
-            int distance = GameField.Distance(attacker.X, attacker.Y, target.X, target.Y);
+            int distance = state.Field.GetDistance(attacker.X, attacker.Y, target.X, target.Y);
             if (distance > attacker.Definition.AttackRange)
                 return ApplyResult.Fail(ApplyError.TargetOutOfRange);
 
             var result = ApplyResult.Ok();
-            target.Hp -= attacker.Definition.DefDamage;
+            target.Hp -= AttackDamageCalculator.Calculate(state, attacker, target);
             if (target.Hp <= 0)
             {
                 state.Field.Remove(target.X, target.Y);
@@ -219,7 +220,7 @@ namespace Magbat.Core
 
                 // атака: вражеские фигуры в пределах дальности атаки
                 foreach (var enemy in enemies)
-                    if (GameField.Distance(piece.X, piece.Y, enemy.X, enemy.Y) <= piece.Definition.AttackRange)
+                    if (field.GetDistance(piece.X, piece.Y, enemy.X, enemy.Y) <= piece.Definition.AttackRange)
                         commands.Add(new AttackCommand(player, piece.Id, enemy.Id));
             }
 
