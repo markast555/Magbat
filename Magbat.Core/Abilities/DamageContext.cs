@@ -1,21 +1,20 @@
-using System.Collections.Generic;
-
 namespace Magbat.Core.Abilities
 {
     /// <summary>
     /// Контекст атаки, передаваемый модификаторам урона.
+    /// Фигуры отдаются как <see cref="IPieceView"/> — только для чтения.
     /// </summary>
     public class DamageContext
     {
         /// <summary>
         /// Атакующая фигура.
         /// </summary>
-        public Piece Attacker { get; }
+        public IPieceView Attacker { get; }
 
         /// <summary>
         /// Цель атаки.
         /// </summary>
-        public Piece Target { get; }
+        public IPieceView Target { get; }
 
         /// <summary>
         /// Базовый урон до применения модификаторов.
@@ -30,7 +29,7 @@ namespace Magbat.Core.Abilities
         /// <summary>
         /// Создает контекст атаки.
         /// </summary>
-        public DamageContext(Piece attacker, Piece target, int baseDamage, IGameFieldView field)
+        public DamageContext(IPieceView attacker, IPieceView target, int baseDamage, IGameFieldView field)
         {
             Attacker = attacker;
             Target = target;

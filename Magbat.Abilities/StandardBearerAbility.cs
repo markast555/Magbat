@@ -1,6 +1,3 @@
-using System.Collections.Generic;
-using System.Linq;
-using Magbat.Core;
 using Magbat.Core.Abilities;
 
 namespace Magbat.Abilities
@@ -10,12 +7,19 @@ namespace Magbat.Abilities
     /// Усиливает атаки союзных фигур (кроме себя) в радиусе 2 на +1 к урону.
     /// Бонусы нескольких знаменосцев складываются.
     /// Мёртвый знаменосец не даёт бонуса (HP <= 0).
+    /// Радиус считается по метрике Чебышёва, граница радиуса включается —
+    /// тем же правилом, что и <see cref="IGameFieldView.GetPiecesInRadius"/>.
     /// </summary>
     public class StandardBearerAbility : IAbility, IDamageModifier
     {
-        private readonly Piece _owner;
+        /// <summary>
+        /// Радиус ауры знаменосца в клетках, граница включается.
+        /// </summary>
+        public const int Radius = 2;
 
-        public StandardBearerAbility(Piece owner)
+        private readonly IPieceView _owner;
+
+        public StandardBearerAbility(IPieceView owner)
         {
             _owner = owner;
         }
@@ -39,8 +43,8 @@ namespace Magbat.Abilities
             if (_owner.Hp <= 0)
                 return 0;
 
-            // Союзник должен быть в радиусе 2
-            if (context.Field.GetDistance(_owner.X, _owner.Y, context.Attacker.X, context.Attacker.Y) > 2)
+            // Союзник должен быть в радиусе 2 (граница радиуса включается)
+            if (!context.Field.IsInRadius(_owner.X, _owner.Y, context.Attacker.X, context.Attacker.Y, Radius))
                 return 0;
 
             return 1;

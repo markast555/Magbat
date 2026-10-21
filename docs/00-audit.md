@@ -28,7 +28,7 @@
 | `DefDamage` | `int` | базовый урон атаки |
 | `MoveRange` | `int` | дальность хода |
 | `AttackRange` | `int` | дальность атаки |
-| `AbilityFactory` | `Func<Piece, IAbility>?` | **добавлено в ходе эксперимента**: фабрика способностей фигуры |
+| `AbilityFactory` | `Func<IPieceView, IReadOnlyList<IAbility>>?` | **добавлено в ходе эксперимента**: фабрика способностей фигуры. Тип уточнён на этапе 3 — фабрика отдаёт **набор** способностей и получает владельца только для чтения (на этапе 2 был `Func<Piece, IAbility>?`) |
 
 **`Magbat.Core/Model/Piece.cs`, класс `Piece`** — экземпляр фигуры на поле:
 
@@ -39,11 +39,20 @@
 | `Definition` | `PieceDefinition` | ссылка на описание |
 | `Hp` | `int` | текущее здоровье (изменяемое) |
 | `X`, `Y` | `int` | координаты на поле (изменяемые) |
-| `Abilities` | `IReadOnlyList<IAbility>` | **добавлено в ходе эксперимента**: список способностей экземпляра |
+| `Abilities` | `IReadOnlyList<IAbility>` | **добавлено в ходе эксперимента**: список способностей экземпляра (копия списка, выданного фабрикой — изменить его снаружи нельзя) |
 
 Создание экземпляра: `Piece` constructor → `CreateAbilities(definition, this)` —
 для каждой фигуры создаются **собственные** экземпляры способностей
 (это нужно для способностей с внутренним состоянием, например для Тотета).
+Фабрика выдаёт **список** способностей, поэтому одна фигура может нести
+несколько независимых способностей — это проверено на этапе 3
+(`CompositionTests`).
+
+Класс `Piece` реализует интерфейс `IPieceView`
+(`Magbat.Core/Abilities/IPieceView.cs`) — read-only представление фигуры:
+только get-only свойства `Id`, `Owner`, `Hp`, `X`, `Y`, `Type`, `Name`,
+`MoveRange`, `AttackRange`, `DefDamage`, `DefHp`. Через `IPieceView` способность
+видит фигуру, но не может её изменить. Реализация интерфейса добавлена на этапе 3.
 
 Реестр описаний: **`Magbat.Core/Model/PieceCatalog.cs`**, метод
 `PieceCatalog.Register(PieceDefinition)` (в ходе эксперимента изменён с
@@ -71,11 +80,24 @@
 | Что нужно | Метод | Файл |
 |---|---|---|
 | фигура по клетке | `GameField.GetAt(int x, int y)` | `Model/GameField.cs:24` |
-| фигура по `Id` | `GameField.FindById(int id)` | `Model/GameField.cs:44` |
-| все фигуры поля (по возрастанию `Id`) | `GameField.GetAllPieces()` | `Model/GameField.cs:59` — **добавлено в ходе эксперимента** |
-| фигуры в радиусе от клетки | `GameField.GetPiecesInRadius(int x, int y, int radius)` | `Model/GameField.cs:80` — **добавлено в ходе эксперимента** |
-| фигуры в соседних клетках | `GameField.GetNeighbors(int x, int y)` | `Model/GameField.cs:98` — **добавлено в ходе эксперимента** |
+| фигура по `Id` | `GameField.FindById(int id)` | `Model/GameField.cs:58` |
+| все фигуры поля (по возрастанию `Id`) | `GameField.GetAllPieces()` | `Model/GameField.cs:73` — **добавлено в ходе эксперимента** |
+| фигуры в радиусе от клетки | `GameField.GetPiecesInRadius(int x, int y, int radius)` | `Model/GameField.cs:97` — **добавлено в ходе эксперимента** |
+| фигуры в соседних клетках | `GameField.GetNeighbors(int x, int y)` | `Model/GameField.cs:115` — **добавлено в ходе эксперимента** |
 | расстояние между клетками | `GameField.Distance(...)` (static) / `GetDistance(...)` | `Model/GameField.cs:30` / `:36` |
+| **«клетка в радиусе» — единый предикат** | `GameField.IsInRadius(centerX, centerY, x, y, radius)` | `Model/GameField.cs:50` — **добавлено на этапе 3** |
+
+**Две «морды» поля.** Публичные методы `GameField` возвращают саму `Piece`
+(изменяемую) — публичный API ядра не менялся. Интерфейс `IGameFieldView`
+реализован **явно** (`Model/GameField.cs:131–140`): способности, работая через
+интерфейс, получают `IPieceView`, то есть read-only представление. Поэтому
+read-only гарантия обеспечена **типами**, а не только словами в документации.
+
+**Смысл радиуса задан один раз** — предикатом `IsInRadius`: расстояние
+**включительно** (`0..radius`, центральная клетка тоже подходит), метрика
+Чебышёва. И `GetPiecesInRadius`, и способность знаменосца пользуются им, поэтому
+расхождение между «правилом поля» и «правилом способности» невозможно;
+это зафиксировано тестом `IsInRadius_AgreesWithGetPiecesInRadius`.
 
 **Метрика расстояния — Чебышёва: `max(|dx|, |dy|)`.** Это та же метрика, что
 используется в правилах хода и атаки, поэтому способности считают расстояние
@@ -193,7 +215,7 @@ if (state.Winner == null)
 
 ---
 
-## 3. Схема ядра версии 1
+## 3. Схема ядра версии 2 (после этапа 3)
 
 Пять-шесть элементов, из которых собирается ядро; пунктиром показано, что
 добавляется экспериментом:
@@ -209,25 +231,32 @@ if (state.Winner == null)
         │  AttackDamageCalculator  ← НОВЫЙ (этап 2)               │
         │  base = attacker.Definition.DefDamage                   │
         │  + Σ IDamageModifier.ModifyAttackDamage(ctx)            │
+        │    (по всем способностям ВСЕХ фигур поля)              │
         └───┬────────────────────────────────────────────┬───────┘
             │ ctx.Attacker / ctx.Target / ctx.BaseDamage  │
+            │ (все три — IPieceView, только чтение)         │
             │ ctx.Field (IGameFieldView)                  │
             ▼                                            ▼
    ┌────────────────────────┐              ┌──────────────────────────┐
    │  IGameFieldView  ← НОВЫЙ│              │  IDamageModifier ← НОВЫЙ  │
    │  (read-only)            │              │  + IAbility      ← НОВЫЙ  │
-   └───────────┬────────────┘              └───────────┬──────────────┘
-               │ реализует                              │ реализует
-               ▼                                        ▼
-   ┌────────────────────────┐              ┌──────────────────────────┐
-   │  GameField (сетка)     │              │  Magbat.Abilities        │
-   │  Piece X/Y, Id, Owner  │              │  StandardBearerAbility   │
-   └───────────┬────────────┘              └──────────────────────────┘
+   │  + IsInRadius ← НОВЫЙ   │              └───────────┬──────────────┘
+   │    (этап 3)             │                          │ реализует
+   └───────────┬────────────┘                          ▼
+               │ реализует (явно)        ┌──────────────────────────┐
+               ▼                          │  Magbat.Abilities        │
+   ┌────────────────────────┐              │  StandardBearerAbility   │
+   │  GameField (сетка)     │              └──────────────────────────┘
+   │  Piece X/Y, Id, Owner  │
+   └───────────┬────────────┘
                │ владеет
                ▼
    ┌────────────────────────────────────────────────────────┐
    │  Piece  ──►  PieceDefinition.AbilityFactory  ← НОВЫЙ   │
    │  (Abilities ← НОВЫЙ)                                   │
+   │  (Piece реализует IPieceView ← НОВЫЙ, этап 3)         │
+   │  AbilityFactory: Func<IPieceView,                      │
+   │                    IReadOnlyList<IAbility>>? ← этап 3   │
    └────────────────────────────────────────────────────────┘
 ```
 
@@ -237,6 +266,7 @@ if (state.Winner == null)
 GameState ──► GameField ──► Piece ──► PieceDefinition ──► IAbility
     │             │                                      (IDamageModifier)
     │             └──► IGameFieldView  ◄── DamageContext.Field
+    │                   (явная реализация → IPieceView)
     └──► AttackDamageCalculator ──► IDamageModifier.ModifyAttackDamage
 ```
 
@@ -269,8 +299,8 @@ GameState ──► GameField ──► Piece ──► PieceDefinition ──�
 | # | Расхождение | Решение | Категория |
 |---|---|---|---|
 | 1 | `Magbat.Abilities` — пустой проект под `net8.0` | переведён на `netstandard2.1` (совместимость с `Magbat.Core`), добавлен код | А |
-| 2 | `Magbat.Abilities.Tests` содержал только шаблон `UnitTest1.cs` | шаблон удалён, добавлены 15 тестов | В |
-| 3 | `Magbat.Abilities.Demo` — «Hello World» | заменён на демонстрацию трёх сценариев | В |
+| 2 | `Magbat.Abilities.Tests` содержал только шаблон `UnitTest1.cs` | шаблон удалён, добавлены 34 теста (15 на этапе 2 + 19 на этапе 3) | В |
+| 3 | `Magbat.Abilities.Demo` — «Hello World» | заменён на демонстрацию четырёх сценариев (три — знаменосец, четвёртый — композиция) | В |
 | 4 | `PieceCatalog.Register` был `private` | стал `public` — внешняя библиотека должна регистрировать описания | А |
 | 5 | Урон считался напрямую (`DefDamage`), точки расширения не было | добавлены `IDamageModifier` и компонент `AttackDamageCalculator` | А |
 | 6 | Нет способности читать состояние поля | добавлен read-only интерфейс `IGameFieldView` | А |
@@ -278,6 +308,10 @@ GameState ──► GameField ──► Piece ──► PieceDefinition ──�
 | 8 | `GameField.Distance` — статический метод | сохранён как есть (публичный API не ломаем); для интерфейса добавлен экземплярный `GetDistance` | В |
 | 9 | У фигуры не было места для способностей | в `PieceDefinition` добавлен `AbilityFactory`, в `Piece` — `Abilities` | А |
 | 10 | Нет точки «начало хода» в ядре | на этом этапе не потребовалась; для Тотета — задача следующего этапа | — |
+| 11 | *(этап 3)* Фабрика умела создать только **одну** способность, хотя у фигуры был список | тип `AbilityFactory` изменён на `Func<IPieceView, IReadOnlyList<IAbility>>?` — фабрика отдаёт набор | А |
+| 12 | *(этап 3)* `IGameFieldView` отдавал **изменяемую** `Piece`: read-only был заявлен, но не обеспечен типами | добавлен `IPieceView` (только get-only свойства); `GameField` реализует интерфейс явно | А |
+| 13 | *(этап 3)* Смысл радиуса задавался в двух местах (в поле и в способности) | добавлен единый предикат `GameField.IsInRadius(...)`; обе стороны пользуются им | А |
+| 14 | *(этап 3)* Проект `Magbat.Abilities` был добавлен в исходный `Magbat.sln` | проект убран из `Magbat.sln` (остался в `Magbat.Experiment.sln`); файл вернулся к базовому состоянию | В |
 
 ---
 
@@ -288,3 +322,30 @@ GameState ──► GameField ──► Piece ──► PieceDefinition ──�
 - Сравнение композиции и наследования — не проводилось.
 - Влияние способностей на сетевую игру (`Magbat.Sim`, 1000 партий) — не проверялось:
   регистрация фигуры `Standard_Bearer` в `PieceCatalog` на сервере не выполнялась.
+
+---
+
+## 7. Уточнения этапа 3 (`exp/03-composition`)
+
+Документ описывает состояние ядра на этапе 1. Этап 3 изменил три места —
+ниже они отмечены явно, остальной текст остаётся точным.
+
+| Что | Было (этап 2) | Стало (этап 3) | Где в коде |
+|---|---|---|---|
+| Фабрика способностей | `Func<Piece, IAbility>?` | `Func<IPieceView, IReadOnlyList<IAbility>>?` | `Magbat.Core/Model/PieceDefinition.cs` |
+| Набор способностей фигуры | список из одного элемента | список произвольной длины, копируется при создании фигуры | `Magbat.Core/Model/Piece.cs` |
+| Представление фигуры для способности | изменяемая `Piece` | `IPieceView` — только get-only свойства | `Magbat.Core/Abilities/IPieceView.cs` |
+| Поле для способности | `IGameFieldView` с `Piece` | `IGameFieldView` с `IPieceView`; публичный API `GameField` не изменился | `Magbat.Core/Abilities/IGameFieldView.cs`, `Magbat.Core/Model/GameField.cs:131` |
+| Атакующий и цель в контексте | `Piece` | `IPieceView` | `Magbat.Core/Abilities/DamageContext.cs` |
+| Смысл радиуса | предикат в поле + свой предикат в способности | один предикат `GameField.IsInRadius(...)`, радиус **включительно** | `Magbat.Core/Model/GameField.cs:50` |
+
+**Что проверено измерениями на этапе 3** (подробно — `docs/RESULTS.md`):
+
+- 34 теста в `Magbat.Abilities.Tests` (было 15), 34 теста в `Magbat.Tests` — без регрессий;
+- композиция: фигура с двумя способностями даёт `3 + 1 + 2 = 6` урона
+  через настоящую атаку `GameRules.ApplyAttack`;
+- экземпляры способностей принадлежат фигуре и не разделяются между фигурами;
+- у `IPieceView` нет ни одного сеттера (проверено рефлексией).
+
+**Что по-прежнему НЕ проверено:** способности с собственным состоянием, событийная
+система, перенос состояния способности через сеть, влияние на сетевую игру.

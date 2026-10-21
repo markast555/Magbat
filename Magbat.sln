@@ -6,8 +6,6 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Magbat.Sim", "Magbat.Sim\Ma
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Magbat.Tests", "Magbat.Tests\Magbat.Tests.csproj", "{8663CD2E-E994-4023-9B5E-9DFC72137856}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Magbat.Abilities", "Magbat.Abilities\Magbat.Abilities.csproj", "{1DDDE2BF-3B5B-424F-8591-829046A1BA92}"
-EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -26,9 +24,5 @@ Global
 		{8663CD2E-E994-4023-9B5E-9DFC72137856}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{8663CD2E-E994-4023-9B5E-9DFC72137856}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{8663CD2E-E994-4023-9B5E-9DFC72137856}.Release|Any CPU.Build.0 = Release|Any CPU
-		{1DDDE2BF-3B5B-424F-8591-829046A1BA92}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{1DDDE2BF-3B5B-424F-8591-829046A1BA92}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{1DDDE2BF-3B5B-424F-8591-829046A1BA92}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{1DDDE2BF-3B5B-424F-8591-829046A1BA92}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

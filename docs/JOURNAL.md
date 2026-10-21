@@ -23,6 +23,9 @@
 |---|---|---|---|---|---|
 | 1 | `exp/00-setup` | `Magbat.sln` | В решение добавлен проект `Magbat.Abilities` | Организация: библиотека способностей должна быть видна в основном решении; на поведение кода не влияет | **В** |
 
+> На этапе 3 это изменение **отменено** (см. запись 15): проект `Magbat.Abilities`
+> убран из `Magbat.sln`, и файл вернулся к состоянию базовой точки.
+
 ## Этап 1. Аудит и фиксация правил (`exp/01-audit`)
 
 Существующий код на этом этапе **не менялся** — этап был чисто аналитическим:
@@ -51,32 +54,95 @@
 
 ---
 
+## Этап 3. Композиция способностей (`exp/03-composition`)
+
+Основание: тег `exp/02-standard-bearer`.
+
+Смысл этапа — закрыть ограничение этапа 2: фигура формально содержала список
+способностей, но фабрика могла создать **только одну**. Без этого нельзя было
+проверить главное утверждение тезиса — что сущность состоит из нескольких
+**независимых** способностей. Одновременно приведён в соответствие с
+документацией read-only доступ к фигуре и уточнён смысл радиуса.
+
+### Изменённые файлы, существовавшие в репозитории до эксперимента — 4 файла
+
+| № | Тег | Файл | Что изменено | Почему | Категория |
+|---|---|---|---|---|---|
+| 8 | `exp/03-composition` | `Magbat.Core/Model/PieceDefinition.cs` | Тип `AbilityFactory` изменён с `Func<Piece, IAbility>?` на `Func<IPieceView, IReadOnlyList<IAbility>>?` | Фабрика должна отдавать **набор** способностей — это необходимое условие для проверки композиции. Заодно фабрика получает владельца только для чтения | **А** |
+| 9 | `exp/03-composition` | `Magbat.Core/Model/Piece.cs` | Класс реализует `IPieceView` (добавлены `Type`, `Name`, `MoveRange`, `AttackRange`, `DefDamage`, `DefHp`); `CreateAbilities` принимает список и **копирует** его | У каждой фигуры — свой набор способностей; список нельзя изменить снаружи | **А** |
+| 10 | `exp/03-composition` | `Magbat.Core/Model/GameField.cs` | Добавлен публичный `IsInRadius(centerX, centerY, x, y, radius)`; `GetPiecesInRadius` теперь использует его; добавлены 5 **явных** реализаций `IGameFieldView`, отдающих `IPieceView` | Смысл радиуса задаётся один раз — предикатом, и способность пользуется тем же правилом. Публичный API ядра не изменился: `GetAt`, `FindById`, `GetAllPieces` по-прежнему отдают `Piece` | **А** |
+| 11 | `exp/03-composition` | `Magbat.sln` | Проект `Magbat.Abilities` **удалён** из основного решения (он остался в `Magbat.Experiment.sln`) | Чистота эксперимента: общее решение меняться не должно. Файл вернулся к состоянию базовой точки — итоговое изменение `Magbat.sln` относительно `exp-baseline` равно нулю | **В** |
+
+### Изменённые файлы, созданные самим экспериментом — 7 файлов
+
+Они не входят в счётчик «изменено существующих файлов» (см. правило в шапке),
+но приводятся здесь полностью, чтобы не потерять часть работы.
+
+| № | Тег | Файл | Что изменено | Почему | Категория |
+|---|---|---|---|---|---|
+| 12 | `exp/03-composition` | `Magbat.Core/Abilities/IGameFieldView.cs` | Все методы, отдающие фигуры, возвращают `IPieceView` вместо `Piece`; добавлен `IsInRadius(...)` | Read-only гарантия обеспечена **типами**, а не только словами в документации; смысл радиуса задан один раз | **А** |
+| 13 | `exp/03-composition` | `Magbat.Core/Abilities/DamageContext.cs` | `Attacker` и `Target` — `IPieceView` вместо `Piece` | Способность не должна получать изменяемую фигуру | **А** |
+| 14 | `exp/03-composition` | `Magbat.Abilities/AbilityCatalog.cs` | Фабрика возвращает список: `new IAbility[] { new StandardBearerAbility(piece) }` | Фабрика должна уметь отдать несколько способностей | **А** |
+| 15 | `exp/03-composition` | `Magbat.Abilities/StandardBearerAbility.cs` | Владелец — `IPieceView`; радиус вынесен в константу `Radius = 2`; проверка радиуса идёт через `context.Field.IsInRadius(...)` | Смысл радиуса определён один раз — в ядре, и способность пользуется тем же предикатом | **А** |
+| 16 | `exp/03-composition` | `Magbat.Abilities.Tests/FieldViewTests.cs` | Уточнены границы радиуса; добавлены `IsInRadius_UsesInclusiveRadius`, `IsInRadius_AgreesWithGetPiecesInRadius` | Документация не должна допускать неоднозначного толкования радиуса | **В** |
+| 17 | `exp/03-composition` | `Magbat.Abilities.Tests/StandardBearerTests.cs` | Добавлен `BearerRadius_MatchesFieldRadiusSemantics` (3 случая) | Правило способности и правило поля обязаны совпадать на границе радиуса | **В** |
+| 18 | `exp/03-composition` | `Magbat.Abilities.Demo/Program.cs` | Добавлен сценарий 4: фигура с двумя способностями | Демонстрация должна показывать главное утверждение тезиса | **В** |
+
+---
+
 ## Итог по журналу
 
-- Изменено существующих файлов: **6** (5 в `Magbat.Core` + 1 файл решения).
+### Файлы, существовавшие в репозитории до эксперимента
+
+- Изменено существующих файлов: **5** — все в `Magbat.Core`
+  (`PieceDefinition.cs`, `Piece.cs`, `GameField.cs`, `PieceCatalog.cs`, `GameRules.cs`).
+- `Magbat.sln` изменялся на этапах 0 и 3, но на этапе 3 вернулся к базовому
+  состоянию: **итоговое изменение — 0 строк**.
 - Из них меняющих **поведение** игры: **1** — `Magbat.Core/Rules/GameRules.cs`
-  (одна строка в `ApplyAttack`).
-- Остальные правки — добавление точек расширения, не меняющие поведение.
+  (одна строка в `ApplyAttack`, с этапа 2). Этап 3 не менял поведение игры:
+  `GetPiecesInRadius` и правило радиуса знаменосца дают тот же результат
+  (проверено тестами: 34 из 34 в обоих наборах).
 - Изменений в системе `Change` и в сетевом протоколе: **0**.
-- **Категория Б (ошибки в ранее написанном коде): ошибок не выявлено.**
-  Все 34 существующих теста `Magbat.Tests` проходят без единой правки их текста.
+
+### Честная оговорка о категории Б
+
+- **Категория Б (ошибки в коде, написанном ДО эксперимента): 0.** Все 34
+  существующих теста `Magbat.Tests` проходят без единой правки их текста.
+- Но на этапе 3 были устранены **два дефекта кода самого эксперимента**,
+  созданного на этапе 2. Они отнесены к категории **А**, потому что это
+  доработка расширяющего механизма, а не исходного кода, и должны быть видны
+  в цифрах:
+  1. **фабрика умела создать только одну способность** — при формальном
+     наличии списка `Abilities` у фигуры. Это делало невозможной проверку
+     композиции, то есть главного утверждения тезиса;
+  2. **read-only доступ был заявлен, но не обеспечен типами**: интерфейс
+     `IGameFieldView` отдавал изменяемую `Piece` (с `set` на `Hp`, `X`, `Y`),
+     поэтому способность теоретически могла изменить фигуру. Документация
+     была сильнее фактических гарантий.
 
 ### Что не попадает в журнал (новые файлы эксперимента)
 
 `Magbat.Core/Abilities/`: `IAbility.cs`, `IDamageModifier.cs`, `DamageContext.cs`,
-`IGameFieldView.cs`, `AttackDamageCalculator.cs`.
+`IGameFieldView.cs`, `IPieceView.cs`, `AttackDamageCalculator.cs`.
 `Magbat.Abilities/`: `StandardBearerAbility.cs`, `AbilityCatalog.cs`.
 `Magbat.Abilities.Tests/`: `StandardBearerTests.cs`, `FieldViewTests.cs`,
-`AttackDamageCalculatorTests.cs`.
-`Magbat.Abilities.Demo/`: `Program.cs`.
+`AttackDamageCalculatorTests.cs`, `CompositionTests.cs`, `PieceViewTests.cs`,
+`TestAbilities.cs`.
+`Magbat.Abilities.Demo/`: `Program.cs`, `FlatDamageAbility.cs`.
 `Magbat.Experiment.sln`, `docs/00-audit.md`, `docs/RULES.md`, `docs/JOURNAL.md`, `docs/RESULTS.md`.
 
 ---
 
-## Проверка регрессии (после этапа 2)
+## Проверка регрессии (после этапа 3)
 
 ```
 dotnet build Magbat.Experiment.sln                  → Предупреждений: 0, Ошибок: 0
-dotnet test  Magbat.Abilities.Tests\...csproj      → 15 пройдено, 0 не пройдено, всего 15
+dotnet build Magbat.sln                            → Предупреждений: 0, Ошибок: 0
+dotnet test  Magbat.Abilities.Tests\...csproj      → 34 пройдено, 0 не пройдено, всего 34
 dotnet test  Magbat.Tests\Magbat.Tests.csproj       → 34 пройдено, 0 не пройдено, всего 34
+dotnet run  --project Magbat.Abilities.Demo        → 4 сценария, вывод корректен
 ```
+
+Было до этапа 3: 15 тестов в `Magbat.Abilities.Tests`. Стало: 34
+(добавлено 19 проверок: композиция — 8, read-only представление фигуры — 6,
+границы радиуса — 2, правило радиуса знаменосца — 3).

@@ -1,33 +1,69 @@
 ﻿using Magbat.Abilities;
 using Magbat.Core;
+using Magbat.Core.Abilities;
 
 namespace Magbat.Abilities.Demo;
 
 /// <summary>
-/// Консольная демонстрация способности «Знаменосец».
-/// Показывает три сценария реальной атаки через GameRules.
+/// Консольная демонстрация способностей.
+/// Показывает четыре сценария реальной атаки через GameRules:
+/// три — для «Знаменосца», четвёртый — для фигуры с двумя способностями.
 /// </summary>
 public static class Program
 {
     private const int Size = 10;
     private const string Bearer = AbilityCatalog.StandardBearerName;
 
+    /// <summary>
+    /// Фигура-композитор: несёт сразу две независимые способности.
+    /// Существует только для демонстрации — в библиотеке способностей
+    /// остаётся одна настоящая способность, «Знаменосец».
+    /// </summary>
+    private const string Composer = "Demo_Composer";
+
     public static void Main()
     {
         AbilityCatalog.RegisterStandardBearer();
+        RegisterComposer();
         var rules = new GameRules();
 
-        Console.WriteLine("=== Демонстрация способности «Знаменосец» ===");
+        Console.WriteLine("=== Демонстрация способностей ===");
         Console.WriteLine("Правило: знаменосец усиливает атаки СОЮЗНИКОВ в радиусе 2 на +1 к урону.");
         Console.WriteLine("Сам себя знаменосец не усиливает, мёртвый знаменосец бонуса не даёт.");
-        Console.WriteLine("Обозначения: W — воин, M — маг, B — знаменосец, C — пушка. Число — HP.");
+        Console.WriteLine("Правило композитора: ещё +2 к урону атак его союзников.");
+        Console.WriteLine("Обозначения: W — воин, M — маг, B — знаменосец, C — пушка, K — композитор. Число — HP.");
         Console.WriteLine();
 
         ScenarioWithoutBearer(rules);
         ScenarioAllyNextToBearer(rules);
         ScenarioBearerDead(rules);
+        ScenarioComposition(rules);
 
         Console.WriteLine("=== Демонстрация завершена ===");
+    }
+
+    /// <summary>
+    /// Регистрирует фигуру с двумя способностями: аура знаменосца и плоская прибавка.
+    /// Фабрика отдаёт список способностей — так одна фигура получает несколько.
+    /// </summary>
+    private static void RegisterComposer()
+    {
+        if (PieceCatalog.GetAll().Any(d => d.Name == Composer))
+            return;
+
+        PieceCatalog.Register(new PieceDefinition(
+            name: Composer,
+            type: PieceType.Support,
+            defHp: 10,
+            defDamage: 3,
+            moveRange: 1,
+            attackRange: 1,
+            abilityFactory: piece => new IAbility[]
+            {
+                new StandardBearerAbility(piece),
+                new FlatDamageAbility(piece, 2)
+            }
+        ));
     }
 
     // ---------- сценарии ----------
@@ -81,6 +117,20 @@ public static class Program
         var r = Attack(rules, state, 0, 2, 4);
 
         Report(r, "мёртвый знаменосец бонуса не даёт");
+    }
+
+    private static void ScenarioComposition(GameRules rules)
+    {
+        Console.WriteLine("--- Сценарий 4: одна фигура с двумя способностями ---");
+        var state = NewState(new[] { Composer, "Warrior_One" }, new[] { "Warrior_One" });
+        PlaceAs(rules, state, 0, Composer, 3, 3);
+        PlaceAs(rules, state, 0, "Warrior_One", 4, 4);
+        PlaceAs(rules, state, 1, "Warrior_One", 4, 5);
+        PrintField(state);
+
+        var r = Attack(rules, state, 0, 2, 3);
+
+        Report(r, "две способности одной фигуры складываются: 3 + 1 + 2");
     }
 
     // ---------- вспомогательные методы ----------
@@ -169,6 +219,7 @@ public static class Program
     private static string Symbol(Piece piece)
     {
         if (piece.Definition.Name == Bearer) return "B";
+        if (piece.Definition.Name == Composer) return "K";
         return piece.Definition.Type switch
         {
             PieceType.Warrior => "W",

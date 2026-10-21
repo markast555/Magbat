@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using Magbat.Core.Abilities;
 
 namespace Magbat.Core
@@ -7,7 +8,7 @@ namespace Magbat.Core
     /// <summary>
     /// Экземпляр фигуры
     /// </summary>
-    public class Piece
+    public class Piece : IPieceView
     {
         public int Id { get; }
         public int Owner { get; }
@@ -17,8 +18,39 @@ namespace Magbat.Core
         public int Y { get; set; }
 
         /// <summary>
+        /// Тип фигуры из её определения.
+        /// </summary>
+        public PieceType Type => Definition.Type;
+
+        /// <summary>
+        /// Имя типа фигуры из её определения.
+        /// </summary>
+        public string Name => Definition.Name;
+
+        /// <summary>
+        /// Дальность хода из определения фигуры.
+        /// </summary>
+        public int MoveRange => Definition.MoveRange;
+
+        /// <summary>
+        /// Дальность атаки из определения фигуры.
+        /// </summary>
+        public int AttackRange => Definition.AttackRange;
+
+        /// <summary>
+        /// Базовый урон атаки из определения фигуры, до применения способностей.
+        /// </summary>
+        public int DefDamage => Definition.DefDamage;
+
+        /// <summary>
+        /// Базовое здоровье из определения фигуры.
+        /// </summary>
+        public int DefHp => Definition.DefHp;
+
+        /// <summary>
         /// Способности этой фигуры. Каждый экземпляр фигуры получает собственные
         /// экземпляры способностей, созданные фабрикой из определения фигуры.
+        /// Фабрика может вернуть несколько способностей — все они попадают сюда.
         /// </summary>
         public IReadOnlyList<IAbility> Abilities { get; }
 
@@ -31,11 +63,16 @@ namespace Magbat.Core
 
         private static IReadOnlyList<IAbility> CreateAbilities(PieceDefinition definition, Piece piece)
         {
-            Func<Piece, IAbility>? factory = definition.AbilityFactory;
+            Func<IPieceView, IReadOnlyList<IAbility>>? factory = definition.AbilityFactory;
             if (factory == null)
                 return Array.Empty<IAbility>();
 
-            return new List<IAbility> { factory(piece) };
+            var abilities = factory(piece);
+            if (abilities == null)
+                return Array.Empty<IAbility>();
+
+            // Копия: список способностей фигуры нельзя изменить снаружи.
+            return abilities.ToArray();
         }
     }
 }

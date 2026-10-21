@@ -28,9 +28,11 @@ namespace Magbat.Abilities
             {
                 if (PieceCatalog.GetAll().Any(d => d.Name == StandardBearerName))
                     return;
-
+    
                 // Параметры зафиксированы в RULES.md: в исходной игре они зависят от клана,
                 // в эксперименте взят один вариант. Тип — Support, как в описании фигуры.
+                // Фабрика возвращает список способностей: сейчас у фигуры одна,
+                // но одна фигура может нести и несколько независимых способностей.
                 PieceCatalog.Register(new PieceDefinition(
                     name: StandardBearerName,
                     type: PieceType.Support,
@@ -38,7 +40,7 @@ namespace Magbat.Abilities
                     defDamage: 2,
                     moveRange: 1,
                     attackRange: 1,
-                    abilityFactory: piece => new StandardBearerAbility(piece)
+                    abilityFactory: piece => new IAbility[] { new StandardBearerAbility(piece) }
                 ));
             }
         }

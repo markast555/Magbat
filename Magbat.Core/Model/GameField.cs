@@ -35,7 +35,21 @@ namespace Magbat.Core
         /// </summary>
         public int GetDistance(int x1, int y1, int x2, int y2)
             => Distance(x1, y1, x2, y2);
-        
+
+        /// <summary>
+        /// Проверяет, находится ли клетка (x, y) в радиусе radius от клетки
+        /// (centerX, centerY). Радиус включительно: расстояние 0..radius,
+        /// центральная клетка тоже подходит. Метрика — Чебышёва.
+        /// </summary>
+        /// <param name="centerX">Координата X центра</param>
+        /// <param name="centerY">Координата Y центра</param>
+        /// <param name="x">Координата X проверяемой клетки</param>
+        /// <param name="y">Координата Y проверяемой клетки</param>
+        /// <param name="radius">Радиус, включительно</param>
+        /// <returns>true, если клетка в радиусе</returns>
+        public bool IsInRadius(int centerX, int centerY, int x, int y, int radius)
+            => Distance(centerX, centerY, x, y) <= radius;
+
         /// <summary>
         /// Ищет обозначенную фигуру на поле
         /// </summary>
@@ -71,18 +85,21 @@ namespace Magbat.Core
         }
 
         /// <summary>
-        /// Возвращает все фигуры в радиусе от клетки
+        /// Возвращает все фигуры в радиусе от клетки. Радиус включительно:
+        /// в результат попадают фигуры на расстоянии от 0 до radius включительно
+        /// (центральная клетка тоже), метрика — Чебышёва.
+        /// Фигуры возвращаются в порядке возрастания Id.
         /// </summary>
         /// <param name="x">Координата X центра</param>
         /// <param name="y">Координата Y центра</param>
-        /// <param name="radius">Радиус</param>
+        /// <param name="radius">Радиус, включительно</param>
         /// <returns>Коллекция фигур в радиусе</returns>
         public IEnumerable<Piece> GetPiecesInRadius(int x, int y, int radius)
         {
             var result = new List<Piece>();
             foreach (var piece in GetAllPieces())
             {
-                if (Distance(x, y, piece.X, piece.Y) <= radius)
+                if (IsInRadius(x, y, piece.X, piece.Y, radius))
                     result.Add(piece);
             }
             return result;
@@ -105,5 +122,21 @@ namespace Magbat.Core
             }
             return result;
         }
+
+        // ---------- IGameFieldView: только чтение ----------
+        // Явная реализация интерфейса: способности получают IPieceView,
+        // а публичные методы поля продолжают отдавать саму Piece.
+        // Публичный API ядра при этом не меняется.
+
+        IPieceView? IGameFieldView.GetAt(int x, int y) => GetAt(x, y);
+
+        IPieceView? IGameFieldView.FindById(int id) => FindById(id);
+
+        IEnumerable<IPieceView> IGameFieldView.GetAllPieces() => GetAllPieces();
+
+        IEnumerable<IPieceView> IGameFieldView.GetPiecesInRadius(int x, int y, int radius)
+            => GetPiecesInRadius(x, y, radius);
+
+        IEnumerable<IPieceView> IGameFieldView.GetNeighbors(int x, int y) => GetNeighbors(x, y);
     }
 }

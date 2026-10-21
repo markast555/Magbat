@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Magbat.Core.Abilities;
 
 namespace Magbat.Core
@@ -24,12 +25,14 @@ namespace Magbat.Core
         /// <summary>
         /// Фабрика способностей фигуры. Вызывается один раз на каждый экземпляр фигуры,
         /// поэтому каждая фигура получает собственные экземпляры способностей.
+        /// Фабрика может вернуть несколько способностей — они все будут у фигуры
+        /// и все будут независимы друг от друга.
         /// null означает, что у фигуры нет способностей.
         /// </summary>
-        public Func<Piece, IAbility>? AbilityFactory { get; }
+        public Func<IPieceView, IReadOnlyList<IAbility>>? AbilityFactory { get; }
 
         public PieceDefinition(string name, PieceType type, int defHp, int defDamage, int moveRange, int attackRange,
-            Func<Piece, IAbility>? abilityFactory = null)
+            Func<IPieceView, IReadOnlyList<IAbility>>? abilityFactory = null)
         {
             Name = name; Type = type; DefHp = defHp; DefDamage = defDamage;
             MoveRange = moveRange; AttackRange = attackRange;

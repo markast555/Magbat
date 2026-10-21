@@ -5,7 +5,62 @@
 
 Базовая точка отсчёта: тег `exp-baseline` → `27abbdedfe271c11676e79b9164eae3000dad660`.
 Ветка: `experiment/abilities`. Теги этапов: `exp/00-setup`, `exp/01-audit`,
-`exp/02-standard-bearer`.
+`exp/02-standard-bearer`, `exp/03-composition`.
+
+---
+
+## Этап 3. Композиция способностей (`exp/03-composition`)
+
+Основание: тег `exp/02-standard-bearer`.
+
+### Что было исправлено
+
+Этап 2 закрыл первый вопрос («можно ли добавить способность»), но оставил
+три незакрытых архитектурных места. Они исправлены на этапе 3:
+
+| # | Проблема этапа 2 | Что стало | Чем проверено |
+|---|---|---|---|
+| 1 | `PieceDefinition.AbilityFactory` имел тип `Func<Piece, IAbility>?` — фигура могла получить **только одну** способность | `Func<IPieceView, IReadOnlyList<IAbility>>?` — фабрика отдаёт **набор** | `CompositionTests` (8 тестов) |
+| 2 | `IGameFieldView` отдавал **изменяемую** `Piece` (с `set` на `Hp`, `X`, `Y`): read-only был **заявлен**, но не обеспечен типами | Новый интерфейс `IPieceView` — только get-only свойства; `IGameFieldView` и `DamageContext` отдают именно его | `PieceViewTests` (6 тестов) |
+| 3 | Смысл радиуса задавался в двух местах (в поле и в способности) и допускал неоднозначное толкование | Единый предикат `GameField.IsInRadius(...)`; и поле, и способность пользуются им | `FieldViewTests` (+2), `StandardBearerTests` (+3) |
+
+Дополнительно: проект `Magbat.Abilities` **убран** из исходного `Magbat.sln`
+(остался только в `Magbat.Experiment.sln`) — общее решение вернулось к
+состоянию базовой точки.
+
+### Главное измерение этапа
+
+Композиция нескольких способностей на одной фигуре работает и складывается:
+
+```
+Базовая атака воина: DefDamage = 3
+Фигура «Композитор» несёт две способности: аура знаменосца (+1) и плоский бонус (+2)
+Итог: 3 + 1 + 2 = 6 урона, HP цели 10 -> 4
+```
+
+Это проверяется **настоящей атакой через `GameRules`**, а не прямым вызовом
+модификатора.
+
+### Новые файлы этапа 3
+
+| Файл | Строк |
+|---|---|
+| `Magbat.Core/Abilities/IPieceView.cs` | 68 |
+| `Magbat.Abilities.Tests/CompositionTests.cs` | 192 |
+| `Magbat.Abilities.Tests/PieceViewTests.cs` | 125 |
+| `Magbat.Abilities.Tests/TestAbilities.cs` | 76 |
+| `Magbat.Abilities.Demo/FlatDamageAbility.cs` | 35 |
+
+Итого 5 новых файлов, **+496 / −0 строк**.
+
+### Изменённые файлы этапа 3
+
+Существовавшие до эксперимента — **3** (`PieceDefinition.cs`, `Piece.cs`,
+`GameField.cs`) + `Magbat.sln` (вернулся к базовому состоянию).
+Созданные экспериментом — **6** (`IGameFieldView.cs`, `DamageContext.cs`,
+`AbilityCatalog.cs`, `StandardBearerAbility.cs`, `FieldViewTests.cs`,
+`StandardBearerTests.cs`, `Program.cs`).
+Подробно — `docs/JOURNAL.md`, записи 8–18.
 
 ---
 
@@ -26,118 +81,170 @@
 | Класс способности | `Magbat.Abilities/StandardBearerAbility.cs`, реализует `IAbility`, `IDamageModifier` |
 | Регистрация описания | `Magbat.Abilities/AbilityCatalog.cs`, `AbilityCatalog.RegisterStandardBearer()` (идемпотентна, потокобезопасна) |
 | Класс фигуры | `Standard_Bearer`, `PieceType.Support`, HP 10, базовый урон 2, ход 1, атака 1 |
-| Механизм применения | `Magbat.Core/Abilities/AttackDamageCalculator.cs`, `Calculate(state, attacker, target)` — при каждой атаке ядро спрашивает `IDamageModifier` у **всех** фигур на поле в порядке возрастания `Id` |
+| Механизм применения | `Magbat.Core/Abilities/AttackDamageCalculator.cs`, `Calculate(state, attacker, target)` — при каждой атаке ядро спрашивает `IDamageModifier` у **всех** фигур на поле в порядке возрастания `Id`; **все** способности фигуры применяются подряд |
+| Способностей у фигуры | **не ограничено одной**: `Piece.Abilities` — список, который заполняет фабрика описания |
 | Требует событийной системы | **Нет** |
 | Требует изменений в `Change`/протоколе | **Нет** (см. `docs/00-audit.md`, раздел 4) |
 
 ### Новые классы и файлы
 
-**Новые файлы — 8 (без тестов и демо), +256 / −0 строк:**
+**Новые файлы — 9 (без тестов и демо), +341 / −0 строк:**
 
 | Файл | Класс/содержимое | Строк |
 |---|---|---|
-| `Magbat.Core/Abilities/IAbility.cs` | `IAbility` — маркерный интерфейс способности | +9 |
-| `Magbat.Core/Abilities/IDamageModifier.cs` | `IDamageModifier` — точка расширения «изменить урон», возвращает **добавку** | +14 |
-| `Magbat.Core/Abilities/DamageContext.cs` | `DamageContext` — атакующий, цель, базовый урон, read-only поле | +41 |
-| `Magbat.Core/Abilities/IGameFieldView.cs` | `IGameFieldView` — единый read-only доступ к полю | +50 |
-| `Magbat.Core/Abilities/AttackDamageCalculator.cs` | `AttackDamageCalculator` — компонент расчёта урона | +34 |
-| `Magbat.Abilities/StandardBearerAbility.cs` | `StandardBearerAbility` — **сама способность** | +49 |
-| `Magbat.Abilities/AbilityCatalog.cs` | `AbilityCatalog` — регистрация описания фигуры | +46 |
-| `Magbat.Abilities/Magbat.Abilities.csproj` | проект библиотеки способностей (переведён на `netstandard2.1`) | +13 |
+| `Magbat.Core/Abilities/IAbility.cs` | `IAbility` — маркерный интерфейс способности | 9 |
+| `Magbat.Core/Abilities/IDamageModifier.cs` | `IDamageModifier` — точка расширения «изменить урон», возвращает **добавку** | 14 |
+| `Magbat.Core/Abilities/IPieceView.cs` | `IPieceView` — read-only представление фигуры: только get-only свойства | 68 |
+| `Magbat.Core/Abilities/DamageContext.cs` | `DamageContext` — атакующий, цель, базовый урон, read-only поле | 40 |
+| `Magbat.Core/Abilities/IGameFieldView.cs` | `IGameFieldView` — единый read-only доступ к полю + предикат радиуса | 62 |
+| `Magbat.Core/Abilities/AttackDamageCalculator.cs` | `AttackDamageCalculator` — компонент расчёта урона | 34 |
+| `Magbat.Abilities/StandardBearerAbility.cs` | `StandardBearerAbility` — **сама способность** | 53 |
+| `Magbat.Abilities/AbilityCatalog.cs` | `AbilityCatalog` — регистрация описания фигуры | 48 |
+| `Magbat.Abilities/Magbat.Abilities.csproj` | проект библиотеки способностей (переведён на `netstandard2.1`) | 13 |
 
-**Новые классы — 7:** `IAbility`, `IDamageModifier`, `DamageContext`, `IGameFieldView`,
-`AttackDamageCalculator`, `StandardBearerAbility`, `AbilityCatalog`.
+**Новые классы — 8:** `IAbility`, `IDamageModifier`, `IPieceView`,
+`DamageContext`, `IGameFieldView`, `AttackDamageCalculator`,
+`StandardBearerAbility`, `AbilityCatalog`.
 
 ### Изменённые существующие файлы и классы
 
-Подробно — `docs/JOURNAL.md`. Итого **6 файлов, +114 / −8 строк**.
+Подробно — `docs/JOURNAL.md`. Итого **5 файлов, +185 / −12 строк**.
 
 | Файл | Класс | Что | Категория |
 |---|---|---|---|
-| `Magbat.Core/Model/PieceDefinition.cs` | `PieceDefinition` | + `AbilityFactory` | А |
-| `Magbat.Core/Model/Piece.cs` | `Piece` | + `Abilities`, `CreateAbilities` | А |
-| `Magbat.Core/Model/GameField.cs` | `GameField` | реализует `IGameFieldView`; + `GetAllPieces`, `GetPiecesInRadius`, `GetNeighbors`, `GetDistance` | А |
+| `Magbat.Core/Model/PieceDefinition.cs` | `PieceDefinition` | + `AbilityFactory`; тип на этапе 3 уточнён до `Func<IPieceView, IReadOnlyList<IAbility>>?` | А |
+| `Magbat.Core/Model/Piece.cs` | `Piece` | + `Abilities`, `CreateAbilities`; реализует `IPieceView` | А |
+| `Magbat.Core/Model/GameField.cs` | `GameField` | реализует `IGameFieldView`; + `GetAllPieces`, `GetPiecesInRadius`, `GetNeighbors`, `GetDistance`, `IsInRadius` | А |
 | `Magbat.Core/Model/PieceCatalog.cs` | `PieceCatalog` | `Register`: `private` → `public` | А |
 | `Magbat.Core/Rules/GameRules.cs` | `GameRules` | **1 строка** в `ApplyAttack` + 3 вызова расстояния | А |
-| `Magbat.sln` | — | добавлен проект `Magbat.Abilities` | В |
+| `Magbat.sln` | — | добавление проекта на этапе 0 **отменено** на этапе 3: итоговое изменение — **0 строк** | В |
 
 **Категория причины: А** (новый механизм — расширение ядра, без которого способность
 не может существовать). Категория **Б** (ошибки в ранее написанном коде) —
-**не выявлена**: все 34 существующих теста проходят без единой правки их текста.
-Категория **В** — одно изменение (`Magbat.sln`), на поведение не влияет.
+**не выявлена**: все 34 существующих теста `Magbat.Tests` проходят без единой
+правки их текста. Категория **В** — одно изменение (`Magbat.sln`), на поведение
+не влияет.
+
+**Честная оговорка.** На этапе 3 были исправлены **два дефекта кода самого
+эксперимента**, созданного на этапе 2: фабрика умела создать только одну
+способность; read-only доступ был заявлен, но не обеспечен типами. Это
+доработка расширяющего механизма, поэтому отнесена к категории **А**, но
+фактически это ошибки эксперимента, а не исходного кода. Подробно —
+`docs/JOURNAL.md`, раздел «Честная оговорка о категории Б».
 
 ### Изменялись ли публичные интерфейсы?
 
-**Сигнатуры существующих публичных членов не менялись** — ни один существующий
-метод не удалён и не переопределён:
+**Сигнатуры публичных членов, существовавших до эксперимента, не менялись** —
+ни один существующий метод не удалён и не переопределён:
 
 - `GameField.Distance(...)` остался `public static` (добавлен экземплярный
   `GetDistance` — *существующий* метод не тронут);
+- `GameField.GetAt`, `FindById`, `GetAllPieces`, `GetPiecesInRadius`,
+  `GetNeighbors` — по-прежнему отдают `Piece`, публичный API ядра не изменился;
+  доступ способностей к `IPieceView` реализован **явными** реализациями
+  интерфейса (`IGameFieldView.GetAt(...)` и т. д.);
 - `PieceDefinition` получил **необязательный** параметр конструктора
   `abilityFactory = null` — обратная совместимость сохранена, существующие
   вызовы компилируются без правок;
-- `Piece` получил новое свойство `Abilities` (только добавление);
+- `Piece` получил новое свойство `Abilities` (только добавление) и реализацию
+  `IPieceView` (только добавление);
 - `PieceCatalog.Register` изменил видимость `private` → `public` (расширение
   доступа, обратная совместимость сохранена).
 
 **Добавлены** новые публичные интерфейсы ядра: `IAbility`, `IDamageModifier`,
-`IGameFieldView` (+ публичный класс `AttackDamageCalculator`).
+`IPieceView`, `IGameFieldView` (+ публичный класс `AttackDamageCalculator`).
+
+**Одно исключение — оговорка честности.** Тип публичного свойства
+`PieceDefinition.AbilityFactory` на этапе 3 **был изменён**:
+`Func<Piece, IAbility>?` → `Func<IPieceView, IReadOnlyList<IAbility>>?`.
+Это ломающее изменение, но **только для самого эксперимента**: свойство
+было добавлено экспериментом на этапе 2 и до эксперимента в ядре не
+существовало. Ни один код, написанный до эксперимента, от этого не зависит.
 
 ### Результат регрессии
 
 | Проверка | Результат | Команда |
 |---|---|---|
-| Сборка | **Предупреждений: 0, Ошибок: 0** | `dotnet build Magbat.Experiment.sln` |
-| Новые тесты | **15 из 15** пройдено, 0 не пройдено | `dotnet test Magbat.Abilities.Tests\Magbat.Abilities.Tests.csproj` |
+| Сборка (решение эксперимента) | **Предупреждений: 0, Ошибок: 0** | `dotnet build Magbat.Experiment.sln` |
+| Сборка (основное решение) | **Предупреждений: 0, Ошибок: 0** | `dotnet build Magbat.sln` |
+| Тесты способностей | **34 из 34** пройдено, 0 не пройдено | `dotnet test Magbat.Abilities.Tests\Magbat.Abilities.Tests.csproj` |
 | Регрессия ядра | **34 из 34** пройдено, 0 не пройдено | `dotnet test Magbat.Tests\Magbat.Tests.csproj` |
 | Изменений в `Changes/` | **0** | чтение кода `ChangeApplier`, `PieceAdded` |
-| Демонстрация | 3 сценария, вывод корректен | `dotnet run --project Magbat.Abilities.Demo` |
+| Демонстрация | 4 сценария, вывод корректен | `dotnet run --project Magbat.Abilities.Demo` |
 
-Состав 15 новых тестов: `StandardBearerTests` — 7 (проверка поведения через
-настоящие команды `GameRules`), `FieldViewTests` — 5 (контракт `IGameFieldView`),
-`AttackDamageCalculatorTests` — 3 (компонент расчёта урона).
+Состав 34 тестов `Magbat.Abilities.Tests`:
 
-### Измеренный объём изменений (`git diff --stat exp-baseline`)
+| Класс тестов | Тестов | Что проверяет |
+|---|---|---|
+| `StandardBearerTests` | 10 | поведение знаменосца через настоящие команды `GameRules` (7) + правило радиуса знаменосца (3) |
+| `FieldViewTests` | 7 | контракт `IGameFieldView` (5) + границы и согласованность радиуса (2) |
+| `AttackDamageCalculatorTests` | 3 | компонент расчёта урона |
+| `CompositionTests` | 8 | **композиция**: набор способностей у фигуры, складывание бонусов, независимость экземпляров |
+| `PieceViewTests` | 6 | **read-only контракт**: у `IPieceView` нет сеттеров, поле отдаёт только представления |
+
+Было до этапа 3: **15** тестов. Стало: **34** (добавлено 19: композиция — 8,
+read-only представление фигуры — 6, границы радиуса — 2, правило радиуса
+знаменосца — 3).
+
+### Измеренный объём изменений (`git diff --stat exp-baseline` + новые файлы)
 
 | Часть | Файлов | Строк |
 |---|---|---|
-| Существующие файлы ядра (`Magbat.Core`) | 5 | **+108 / −8** |
-| Существующий файл решения `Magbat.sln` | 1 | +6 / −0 |
-| **Существующие файлы — итого** | **6** | **+114 / −8** |
-| Новые файлы (`Magbat.Core/Abilities`, `Magbat.Abilities`) | 8 | +256 / −0 |
-| **Итого по `Magbat.Core` + `Magbat.Abilities` (без тестов и демо)** | **13** | **+364 / −8** |
-| Тесты (`Magbat.Abilities.Tests`) | 4 | +340 / −0 |
-| Демо (`Magbat.Abilities.Demo`) | 2 | +195 / −0 |
-| Документация (`docs/`) | 4 | +720 / −0 |
-| Файлы решений (`Magbat.Experiment.sln`, `Magbat.sln`) | 2 | +82 / −0 |
-| **Итого по всему изменению** | **25** | **+1703 / −8** |
+| Существующие файлы ядра (`Magbat.Core`) | 5 | **+185 / −12** |
+| Существующий файл решения `Magbat.sln` | 1 | **0 / −0** (вернулся к базовому состоянию) |
+| **Существующие файлы — итого** | **5** | **+185 / −12** |
+| Новые файлы (`Magbat.Core/Abilities`, `Magbat.Abilities`) | 9 | +341 / −0 |
+| **Итого по `Magbat.Core` + `Magbat.Abilities` (без тестов и демо)** | **14** | **+526 / −12** |
+| Тесты (`Magbat.Abilities.Tests`) | 7 | +785 / −0 |
+| Демо (`Magbat.Abilities.Demo`) | 3 | +281 / −0 |
+| Документация (`docs/`) | 4 | +982 / −0 |
+| Файлы решений (`Magbat.Experiment.sln`) | 1 | +76 / −0 |
+| **Итого по всему изменению** | **29** | **+2650 / −12** |
+
+Отдельно — объём **этапа 3** (`git diff --numstat exp/02-standard-bearer` +
+5 новых файлов): **20 файлов, +1077 / −134**, из них код — 11 файлов
+(+235 / −48), документация — 4 файла (+346 / −86), новые файлы — 5 (+496 / −0).
 
 ### Дублирование кода
 
 | Фрагмент | Где продублировано | Почему дублируется |
 |---|---|---|
 | Обход поля двойным циклом по клеткам | `GameField.GetAllPieces()` — копия логики `GameRules.GetPieces` (`GameRules.cs:237`) и `GameRules.CountPieces` (`GameRules.cs:176`) | Правило эксперимента: существующий код ядра не переписывается. Нужна read-only выдача фигур через интерфейс, а переписать `GetPieces`/`CountPieces` — значит изменить поведение ядра. Объём дублирования — 12 строк |
-| Перебор фигур с фильтром по расстоянию | `GameField.GetNeighbors(x, y)` реализован как `GetAllPieces()` + фильтр `Distance == 1`; `GetPiecesInRadius` — как `GetAllPieces()` + фильтр `Distance <= radius` | Контракт `IGameFieldView` требует **две разные операции** («соседи» и «в радиусе»). Общая часть вынесена в `GetAllPieces()`, дублируется только предикат |
+| Перебор фигур с фильтром по расстоянию | `GameField.GetNeighbors(x, y)` реализован как `GetAllPieces()` + фильтр `Distance == 1`; `GetPiecesInRadius` — как `GetAllPieces()` + фильтр через `IsInRadius` | Контракт `IGameFieldView` требует **две разные операции** («соседи» и «в радиусе»). Общая часть вынесена в `GetAllPieces()`, дублируется только предикат |
 | Вызов метрики расстояния | `GameField.GetDistance` делегирует статическому `Distance` | Статический `Distance` — часть публичного API ядра; удалять или менять его нельзя |
-| Тестовые помощники `PlaceAs` / `Put` / `NewState` | В трёх тестовых классах: `StandardBearerTests`, `FieldViewTests`, `AttackDamageCalculatorTests` | Изоляция тестовых классов. Общий базовый класс потребовал бы создания файла в существующем проекте `Magbat.Tests` — лишнее изменение чужого кода |
+| Тестовые способности | `Magbat.Abilities.Tests/TestAbilities.cs` и `Magbat.Abilities.Demo/FlatDamageAbility.cs` содержат по одной простой способности «+N к урону союзника» | Тестовый и демонстрационный проекты не должны зависеть друг от друга; в обоих нужен простой модификатор для проверки композиции |
+| Тестовые помощники `PlaceAs` / `Put` / `NewState` | В пяти тестовых классах: `StandardBearerTests`, `FieldViewTests`, `AttackDamageCalculatorTests`, `CompositionTests`, `PieceViewTests` | Изоляция тестовых классов. Общий базовый класс потребовал бы создания файла в существующем проекте `Magbat.Tests` — лишнее изменение чужого кода |
 | Хелперы `PlaceAs` / `Attack` | `Magbat.Abilities.Demo/Program.cs` — те же по смыслу действия, что в тестах | Демо — отдельный исполняемый проект; он не должен зависеть от тестового проекта |
+
+**Устранено на этапе 3:** правило «в радиусе» больше не продублировано.
+На этапе 2 предикат расстояния встречался и в поле, и в способности; теперь он
+задан **один раз** — в `GameField.IsInRadius(...)`, и обе стороны пользуются им.
+Тест `IsInRadius_AgreesWithGetPiecesInRadius` фиксирует, что расхождение
+невозможно.
 
 ### Затраченное время
 
-**≈ 6 часов** (оценка по длительности сессии; точное время инструментом не
+**≈ 8 часов** (оценка по длительности сессий; точное время инструментом не
 измерялось). Из них: чтение ядра и проектирование — ≈ 1,5 ч; реализация
-этапа 2 — ≈ 2,5 ч; тесты и отладка — ≈ 1,5 ч; документация и Git — ≈ 0,5 ч.
+этапа 2 — ≈ 2,5 ч; тесты и отладка — ≈ 1,5 ч; документация и Git — ≈ 0,5 ч;
+**этап 3 (рефакторинг фабрики, `IPieceView`, тесты композиции, правка
+документации) — ≈ 2 ч**.
 
 ### Вывод
 
 Способность «Знаменосец» добавлена **преимущественно отдельными классами**:
 вся её логика лежит в двух классах `Magbat.Abilities`, а в ядре изменено
-**5 существующих файлов (+108 / −8 строк)**, причём **поведение** ядра изменилось
+**5 существующих файлов (+185 / −12 строк)**, причём **поведение** ядра изменилось
 ровно в **одном месте** — одной строке расчёта урона в `GameRules.ApplyAttack`;
-изменений в системе `Change` и в протоколе не потребовалось. Это подтверждает,
-что для способностей-аур выбранная схема «композиция + интерфейс в ядре»
-работает без переписывания ядра; обобщаемость схемы на способности с
-собственным состоянием (Тотем, Горение) на этом этапе **не проверена**.
+изменений в системе `Change` и в протоколе не потребовалось.
+
+Этап 3 закрыл главное ограничение этапа 2: **фигура может нести несколько
+независимых способностей**, их бонусы складываются, а экземпляры способностей
+принадлежат конкретной фигуре и не разделяются между фигурами. Read-only
+доступ теперь обеспечен **типами** (`IPieceView`), а не только словами в
+документации; смысл радиуса задан одним предикатом. Обобщаемость схемы на
+способности с собственным состоянием (Тотем, Горение) на этом этапе **не
+проверена** — это задача следующего этапа.
 
 ---
 
@@ -145,6 +252,7 @@
 
 ```
 dotnet build Magbat.Experiment.sln
+dotnet build Magbat.sln
 dotnet test  Magbat.Abilities.Tests\Magbat.Abilities.Tests.csproj
 dotnet test  Magbat.Tests\Magbat.Tests.csproj
 dotnet run --project Magbat.Abilities.Demo\Magbat.Abilities.Demo.csproj
@@ -156,7 +264,12 @@ dotnet run --project Magbat.Abilities.Demo\Magbat.Abilities.Demo.csproj
 Сценарий 1 (без знаменосца):   базовый урон 3, нанесено 3, HP 10 -> 7
 Сценарий 2 (союзник рядом):     базовый урон 3, нанесено 4, HP 10 -> 6
 Сценарий 3 (знаменосец погиб):  базовый урон 3, нанесено 3, HP 10 -> 7
+Сценарий 4 (две способности):  базовый урон 3, нанесено 6, HP 10 -> 4
 ```
+
+Сценарий 4 — главное измерение этапа 3: фигура «Композитор» несёт **две**
+способности (аура знаменосца `+1` и плоский бонус `+2`), бонусы складываются:
+`3 + 1 + 2 = 6`.
 
 ---
 
@@ -164,7 +277,8 @@ dotnet run --project Magbat.Abilities.Demo\Magbat.Abilities.Demo.csproj
 
 | Способность | Подход | Класс в `Magbat.Abilities` | Новые точки расширения в ядре | Изменено существующих файлов ядра | Строк в ядре (новое + правки) | Изменений в `Change` | Нужна событийная система | Тестов | Статус |
 |---|---|---|---|---|---|---|---|---|---|
-| Знаменосец | Композиция | `StandardBearerAbility` | 4 (`IAbility`, `IDamageModifier`, `IGameFieldView`, `PieceDefinition.AbilityFactory`) + 1 компонент (`AttackDamageCalculator`) | 5 | +256 / +108 = 364 (без тестов и демо) | 0 | Нет | 7 (+8 на интерфейс и компонент) | **Реализован, проверен** |
+| Знаменосец | Композиция | `StandardBearerAbility` | 5 (`IAbility`, `IDamageModifier`, `IPieceView`, `IGameFieldView`, `PieceDefinition.AbilityFactory`) + 1 компонент (`AttackDamageCalculator`) | 5 | +341 + 185 = 526 (без тестов и демо) | 0 | Нет | 10 (+24 на интерфейс и компонент) | **Реализован, проверен** |
+| Композиция (две способности на одной фигуре) | Композиция | — (используются `StandardBearerAbility` + тестовая/демо-способность) | — (использует `PieceDefinition.AbilityFactory`) | 0 | 0 | 0 | Нет | 8 | **Реализована, проверена** |
 | Тотем чёрной крови | — | — | — | — | — | — | **Да** | — | Правила зафиксированы, не начат |
 | Теневой демон | — | — | — | — | — | — | Нет | — | Правила зафиксированы, не начат |
 | Горение | — | — | — | — | — | — | **Да** | — | Правила зафиксированы, не начат |
@@ -172,13 +286,13 @@ dotnet run --project Magbat.Abilities.Demo\Magbat.Abilities.Demo.csproj
 
 ---
 
-## Что можно утверждать по итогам этапов 1–2
+## Что можно утверждать по итогам этапов 1–3
 
 Подтверждено измерениями:
 
 1. Способность **может быть добавлена преимущественно отдельными классами**:
    реализация целиком лежит в `Magbat.Abilities` (2 новых класса), ядро получило
-   4 общие точки расширения и 1 компонент расчёта.
+   5 общих точек расширения и 1 компонент расчёта.
 2. Изменение в **поведении** ядра потребовалось **в одном месте** — точке расчёта
    урона (`GameRules.ApplyAttack`); остальные правки — точки расширения, не
    меняющие поведение.
@@ -189,11 +303,19 @@ dotnet run --project Magbat.Abilities.Demo\Magbat.Abilities.Demo.csproj
 4. Детерминизм соблюдён: расчёт зависит только от состояния поля; `Random` и
    системное время не используются; обход фигур — по возрастанию `Id`.
 5. Способность может читать поле **только** через read-only интерфейс —
-   ядро не предоставляет способностям ни мутаторов, ни доступа к рукам.
+   ядро не предоставляет способностям ни мутаторов, ни доступа к рукам;
+   гарантия обеспечена **типами** (`IPieceView` — только get-only свойства),
+   а не только документацией.
+6. **Одна фигура может нести несколько способностей**: их бонусы складываются,
+   а экземпляры принадлежат фигуре и не разделяются между фигурами.
+7. Смысл «в радиусе» задан **один раз** и не может разойтись между полем и
+   способностью — это проверяется тестом.
 
 Пока не утверждается (требует следующих этапов):
 
 - что аура — единственный вид способностей, который не требует событий;
-- обобщаемость выбранной схемы на способности с собственным состоянием;
+- обобщаемость выбранной схемы на способности с собственным состоянием
+  (Тотем, Горение);
+- перенос состояния способности через сеть (нужен новый тип `Change`);
 - выводы о преимуществах композиции перед наследованием;
 - влияние способностей на сетевую игру (`Magbat.Sim`, 1000 партий).
