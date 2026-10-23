@@ -99,10 +99,14 @@ public sealed class GameSimulation : IDisposable
     /// Партии не закончились за отведённое время
     /// </exception>
     /// <exception cref="InvalidOperationException">
+    /// Повторный вызов,
     /// Клиент сообщил об ошибке
     /// </exception>
     public SimulationResult Run(IReadOnlyList<int> seeds, TimeSpan timeout)
     {
+        if (_finished != null)
+            throw new InvalidOperationException("Run can be called only once");
+        
         var result = new SimulationResult();
         var finished = new CountdownEvent(seeds.Count * 2);
         _finished = finished;
