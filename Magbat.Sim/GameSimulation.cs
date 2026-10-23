@@ -106,6 +106,7 @@ public sealed class GameSimulation : IDisposable
         var result = new SimulationResult();
         var finished = new CountdownEvent(seeds.Count * 2);
         _finished = finished;
+        var firstMovers = new List<GameClient>();
 
         foreach (int seed in seeds)
         {
@@ -122,13 +123,16 @@ public sealed class GameSimulation : IDisposable
                     SendUp, () => finished.Signal(), Fail);
                 _clients[(seed, player)] = client;
                 result.ClientStates[(seed, player)] = client.State;
+                if (client.State.CurrentPlayer == player)
+                    firstMovers.Add(client);
             }
         }
-
-        // Клиенты запускаются после создания всех: иначе сообщение могло бы прийти
-        // к клиенту, которого ещё нет в словаре
+        
+        // Запускать нужно только того, кто ходит первым. Второй клиент ждёт сообщения сервера:
+        // если бы его запускал основной поток, он мог бы отправить вторую команду параллельно
+        // с обработкой ответа в потоке канала
         _server.Start();
-        foreach (var client in _clients.Values)
+        foreach (var client in firstMovers)
             client.Start();
 
         // Ждём, пока сработает одно из двух событий или истечёт время.

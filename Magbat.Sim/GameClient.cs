@@ -51,12 +51,12 @@ public sealed class GameClient
     }
 
     /// <summary>
-    /// Делает первый ход, если сейчас очередь этого игрока
+    /// Делает первый ход
     /// </summary>
+    /// <remarks>Вызывать только для игрока, который ходит первым</remarks>
     public void Start()
     {
-        if (State.CurrentPlayer == _player)
-            SendNext();
+        SendNext();
     }
     
     /// <summary>
