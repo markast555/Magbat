@@ -56,4 +56,14 @@ public class RandomBot
 
         if (list.Count > 0) groups.Add(list);
     }
+    
+    /// <summary>
+    /// Создаёт бота для игрока указанной партии
+    /// </summary>
+    /// <param name="gameSeed">Номер партии</param>
+    /// <param name="player">Номер игрока</param>
+    public static RandomBot ForGame(int gameSeed, int player)
+    {
+        return new RandomBot(gameSeed * 2 + player);
+    }
 }

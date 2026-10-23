@@ -123,7 +123,7 @@ public sealed class GameSimulation : IDisposable
             {
                 var client = new GameClient(
                     seed, player, GameFactory.NewGame(), _rules,
-                    new RandomBot(seed * 2 + player),
+                    RandomBot.ForGame(seed, player),
                     SendUp, () => finished.Signal(), Fail);
                 _clients[(seed, player)] = client;
                 result.ClientStates[(seed, player)] = client.State;

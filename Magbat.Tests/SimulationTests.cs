@@ -17,7 +17,7 @@ public class SimulationTests
         foreach (int seed in seeds)
         {
             var direct = GameFactory.NewGame();
-            GameRunner.Play(direct, rules, new[] { new RandomBot(seed * 2), new RandomBot(seed * 2 + 1) });
+            GameRunner.Play(direct, rules, new[] { RandomBot.ForGame(seed, 0), RandomBot.ForGame(seed, 1) });
 
             StateAssert.Same(direct, result.ServerStates[seed]);
             StateAssert.Same(direct, result.ClientStates[(seed, 0)]);

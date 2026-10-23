@@ -6,7 +6,7 @@ var rules = new GameRules();
 
 GameResult Run(int seed) => GameRunner.Play(
     GameFactory.NewGame(), rules,
-    new[] { new RandomBot(seed * 2), new RandomBot(seed * 2 + 1) });
+    new[] { RandomBot.ForGame(seed, 0), RandomBot.ForGame(seed, 1) });
 
 // проверка воспроизводимости: один и тот же seed даёт одну и ту же партию
 var a = Run(1);

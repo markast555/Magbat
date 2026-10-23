@@ -14,7 +14,7 @@ public class ChangeApplierTests
         {
             var real = GameFactory.NewGame();
             var copy = GameFactory.NewGame();
-            var bots = new[] { new RandomBot(seed * 2), new RandomBot(seed * 2 + 1) };
+            var bots = new[] { RandomBot.ForGame(seed, 0), RandomBot.ForGame(seed, 1) };
 
             int turns = 0;
             while (real.Winner == null && turns < 500)
