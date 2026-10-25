@@ -9,6 +9,9 @@ namespace Magbat.Sim;
 /// </summary>
 public sealed class GameClient
 {
+    // Сообщения сервера и запланированные ходы приходят из разных потоков
+    private readonly object _sync = new object();
+    
     private readonly int _gameId;
     private readonly int _player;
     private readonly GameRules _rules;
@@ -16,9 +19,13 @@ public sealed class GameClient
     private readonly Action<ClientMessage> _send; // отправляет команду серверу
     private readonly Action _onFinished;          // вызывается, когда партия окончена
     private readonly Action<string> _onFailed;    // вызывается при ошибке, получает её описание
+    private readonly Pacing? _pacing;
     private bool _finished;
-    private bool _awaitingResponse; // флаг ожидания
+    private bool _awaitingResponse; // флаг ожидания, нужен при периодических снимках
 
+    // Ход запланирован, но ещё не отправлен
+    private bool _moveScheduled;
+    
     /// <summary>Собственная копия состояния партии</summary>
     public GameState State { get; }
 
@@ -37,8 +44,9 @@ public sealed class GameClient
     /// <param name="send">Метод отправки команды серверу</param>
     /// <param name="onFinished">Метод, вызываемый при окончании партии</param>
     /// <param name="onFailed">Метод, вызываемый при ошибке</param>
+    /// <param name="pacing">Паузы перед ходами</param>
     public GameClient(int gameId, int player, GameState state, GameRules rules, RandomBot bot,
-        Action<ClientMessage> send, Action onFinished, Action<string> onFailed)
+        Action<ClientMessage> send, Action onFinished, Action<string> onFailed, Pacing? pacing = null)
     {
         _gameId = gameId;
         _player = player;
@@ -49,6 +57,7 @@ public sealed class GameClient
         _send = send;
         _onFinished = onFinished;
         _onFailed = onFailed;
+        _pacing = pacing;
     }
 
     /// <summary>
@@ -57,9 +66,10 @@ public sealed class GameClient
     /// <remarks>Вызывать только для игрока, который ходит первым</remarks>
     public void Start()
     {
-        SendNext();
+        lock (_sync)
+            PlanMove();
     }
-    
+
     /// <summary>
     /// Обновляет копию состояния по сообщению сервера и делает следующий ход, если очередь клиента
     /// </summary>
@@ -67,33 +77,75 @@ public sealed class GameClient
     /// <param name="message">Сообщение сервера</param>
     public void OnServerMessage(ServerMessage message)
     {
-        if (message.Player == _player)
+        lock (_sync) 
         {
-            _awaitingResponse = false;
-            LatenciesMs.Add(Stopwatch.GetElapsedTime(message.CommandSentAt).TotalMilliseconds);
-
-            // Бот выбирает только допустимые команды, поэтому отказ означает ошибку в программе
-            if (message.Error != ApplyError.None)
+            if (message.Player == _player)
             {
-                _onFailed($"Game {_gameId}, player {_player}: server rejected the command ({message.Error})");
+                _awaitingResponse = false;
+                LatenciesMs.Add(Stopwatch.GetElapsedTime(message.CommandSentAt).TotalMilliseconds);
+
+                // Бот выбирает только допустимые команды, поэтому отказ означает ошибку в программе
+                if (message.Error != ApplyError.None)
+                {
+                    _onFailed($"Game {_gameId}, player {_player}: server rejected the command ({message.Error})");
+                    return;
+                }
+            }
+
+            ChangeApplier.Apply(State, message.Changes);
+
+            if (State.Winner != null)
+            {
+                if (!_finished)
+                {
+                    _finished = true;
+                    _onFinished();
+                }
+
                 return;
             }
+
+            if (State.CurrentPlayer == _player && !_awaitingResponse)
+                PlanMove();
         }
+    }
+    
+    /// <summary>
+    /// Отправляет ход сразу или после паузы
+    /// </summary>
+    private void PlanMove()
+    {
+        if (_moveScheduled) return;
 
-        ChangeApplier.Apply(State, message.Changes);
-
-        if (State.Winner != null)
+        if (_pacing == null)
         {
-            if (!_finished)
-            {
-                _finished = true;
-                _onFinished();
-            }
+            SendNext();
             return;
         }
 
-        if (State.CurrentPlayer == _player && !_awaitingResponse)
-            SendNext();
+        _moveScheduled = true;
+        _pacing.Schedule(SendScheduled);
+    }
+    
+    /// <summary>
+    /// Отправляет запланированный ход, если он всё ещё актуален
+    /// </summary>
+    private void SendScheduled()
+    {
+        // Исключение в потоке планировщика завершило бы программу, поэтому передаём его наверх
+        try
+        {
+            lock (_sync)
+            {
+                _moveScheduled = false;
+                if (State.Winner == null && State.CurrentPlayer == _player && !_awaitingResponse)
+                    SendNext();
+            }
+        }
+        catch (Exception e)
+        {
+            _onFailed(e.Message);
+        }
     }
 
     /// <summary>
