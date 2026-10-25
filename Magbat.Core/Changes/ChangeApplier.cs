@@ -49,6 +49,26 @@ namespace Magbat.Core
                     case GameEnded ended:
                         state.Winner = ended.Winner;
                         break;
+                    case StateSnapshot snapshot:
+                    {
+                        state.Field.Clear();
+                        foreach (var p in snapshot.Pieces)
+                        {
+                            var piece = new Piece(p.Id, p.Owner, PieceCatalog.Get(p.PieceName), p.X, p.Y);
+                            piece.Hp = p.Hp;
+                            state.Field.Put(piece);
+                        }
+
+                        for (int i = 0; i < 2; i++)
+                        {
+                            state.Hands[i].Clear();
+                            state.Hands[i].AddRange(snapshot.Hands[i]);
+                        }
+
+                        state.CurrentPlayer = snapshot.CurrentPlayer;
+                        state.Winner = snapshot.Winner;
+                        break;
+                    }
                 }
             }
         }

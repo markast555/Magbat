@@ -29,4 +29,20 @@ public class ChangeApplierTests
             }
         }
     }
+    
+    [Fact]
+    public void Snapshot_ReproducesRealState()
+    {
+        var rules = new GameRules();
+        var real = GameFactory.NewGame();
+        var bots = new[] { RandomBot.ForGame(7, 0), RandomBot.ForGame(7, 1) };
+
+        for (int i = 0; i < 40 && real.Winner == null; i++)
+            rules.Apply(real, bots[real.CurrentPlayer].Choose(rules.GetLegalCommands(real)));
+
+        var copy = GameFactory.NewGame();
+        ChangeApplier.Apply(copy, new Change[] { StateSnapshot.From(real) });
+
+        StateAssert.Same(real, copy);
+    }
 }

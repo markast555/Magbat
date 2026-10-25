@@ -43,5 +43,13 @@ namespace Magbat.Core
             }
             return null;
         }
+        
+        /// <summary>
+        /// Убирает все фигуры с поля
+        /// </summary>
+        public void Clear()
+        {
+            Array.Clear(_cells, 0, _cells.Length);
+        }
     }
 }
