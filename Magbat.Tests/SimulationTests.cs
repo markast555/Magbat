@@ -9,12 +9,28 @@ public class SimulationTests
     public void EventServer_PlaysSameGamesAsDirectRunner()
     {
         var rules = new GameRules();
-        var seeds = Enumerable.Range(1, 100).ToList();
-        using var simulation = new GameSimulation(new EventServer(rules), rules, delayMs: 0);
+        AssertMatchesDirectPlay(new EventServer(rules), rules, games: 100);
+    }
 
-        var result = simulation.Run(seeds, TimeSpan.FromSeconds(60));
+    [Theory]
+    [InlineData(30, BroadcastMode.Delta)]
+    [InlineData(30, BroadcastMode.FullSnapshot)]
+    [InlineData(10, BroadcastMode.Delta)]
+    public void TickServer_PlaysSameGamesAsDirectRunner(int hz, BroadcastMode mode)
+    {
+        var rules = new GameRules();
+        AssertMatchesDirectPlay(new TickServer(rules, hz, mode), rules, games: 30);
+    }
+
+    private static void AssertMatchesDirectPlay(IGameServer server, GameRules rules, int games)
+    {
+        var seeds = Enumerable.Range(1, games).ToList();
+        using var simulation = new GameSimulation(server, rules, delayMs: 0);
+
+        var result = simulation.Run(seeds, TimeSpan.FromSeconds(120));
 
         foreach (int seed in seeds)
+
         {
             var direct = GameFactory.NewGame();
             GameRunner.Play(direct, rules, new[] { RandomBot.ForGame(seed, 0), RandomBot.ForGame(seed, 1) });

@@ -23,8 +23,20 @@ for (int seed = 1; seed <= 1000; seed++)
 }
 Console.WriteLine($"Finished with winner: {won}, hit turn limit: {limit}, average turns: {totalTurns / 1000.0:F1}");
 
-using var simulation = new GameSimulation(new EventServer(rules), rules, delayMs: 0);
+using var simulationEventServer = new GameSimulation(new EventServer(rules), rules, delayMs: 0);
 var watch = Stopwatch.StartNew();
-var simulationResult = simulation.Run(Enumerable.Range(1, 1000).ToList(), TimeSpan.FromMinutes(2));
+var simulationResult = simulationEventServer.Run(Enumerable.Range(1, 1000).ToList(), TimeSpan.FromMinutes(2));
 Console.WriteLine($"EventServer: {simulationResult.ServerStates.Count} games in {watch.Elapsed.TotalSeconds:F1} s, " +
                   $"average latency {simulationResult.LatenciesMs.Average():F3} ms");
+
+foreach (var (hz, mode) in new[] { (30, BroadcastMode.Delta), (30, BroadcastMode.FullSnapshot), (10, BroadcastMode.Delta) })
+{
+    var server = new TickServer(rules, hz, mode);
+    var simulationTickServer = new GameSimulation(server, rules, 0);
+    var result = simulationTickServer.Run(Enumerable.Range(1, 1000).ToList(), TimeSpan.FromMinutes(3));
+    simulationTickServer.Dispose();
+
+    Console.WriteLine($"TickServer {hz} Hz {mode}: average latency {result.LatenciesMs.Average():F1} ms, " +
+                      $"ticks {server.Ticks} (idle {server.IdleTicks}), " +
+                      $"interval mean {server.MeanIntervalMs:F1} / min {server.MinIntervalMs:F1} / max {server.MaxIntervalMs:F1} ms");
+}                  
