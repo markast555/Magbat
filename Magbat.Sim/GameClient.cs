@@ -17,6 +17,7 @@ public sealed class GameClient
     private readonly Action _onFinished;          // вызывается, когда партия окончена
     private readonly Action<string> _onFailed;    // вызывается при ошибке, получает её описание
     private bool _finished;
+    private bool _awaitingResponse; // флаг ожидания
 
     /// <summary>Собственная копия состояния партии</summary>
     public GameState State { get; }
@@ -68,6 +69,7 @@ public sealed class GameClient
     {
         if (message.Player == _player)
         {
+            _awaitingResponse = false;
             LatenciesMs.Add(Stopwatch.GetElapsedTime(message.CommandSentAt).TotalMilliseconds);
 
             // Бот выбирает только допустимые команды, поэтому отказ означает ошибку в программе
@@ -90,7 +92,7 @@ public sealed class GameClient
             return;
         }
 
-        if (State.CurrentPlayer == _player)
+        if (State.CurrentPlayer == _player && !_awaitingResponse)
             SendNext();
     }
 
@@ -99,6 +101,8 @@ public sealed class GameClient
     /// </summary>
     private void SendNext()
     {
+        _awaitingResponse = true;
+        
         var command = _bot.Choose(_rules.GetLegalCommands(State));
         _send(new ClientMessage(_gameId, command, Stopwatch.GetTimestamp()));
     }
