@@ -28,6 +28,8 @@ public sealed class TickServer : IGameServer
     private volatile bool _stopping;
 
     public event Action<ServerMessage>? Updated;
+    
+    public ServerStats Stats { get; } = new ServerStats();
 
     /// <summary>Число выполненных тиков</summary>
     /// <remarks>Читать после Dispose</remarks>
@@ -108,6 +110,8 @@ public sealed class TickServer : IGameServer
     /// </summary>
     private void Run()
     {
+        Stats.OnThreadStart();
+        
         // Расписание считается от начальной точки: ошибки ожидания не накапливаются
         long next = Stopwatch.GetTimestamp() + _intervalTicks;
         while (!_stopping)
@@ -169,6 +173,8 @@ public sealed class TickServer : IGameServer
     /// <returns>Число обработанных команд</returns>
     private int Tick()
     {
+        long started = Stopwatch.GetTimestamp();
+        
         int processed = 0;
         while (_incoming.TryDequeue(out var message))
         {
@@ -179,6 +185,7 @@ public sealed class TickServer : IGameServer
         if (_mode == BroadcastMode.FullSnapshot)
             BroadcastSnapshots();
 
+        Stats.AddBusy(started);
         return processed;
     }
 

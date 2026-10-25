@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using Magbat.Core;
 
 namespace Magbat.Sim;
@@ -19,6 +20,8 @@ public sealed class EventServer : IGameServer
     /// </summary>
     /// <remarks>Подписчики вызываются в потоке сервера, поэтому должны работать быстро</remarks>
     public event Action<ServerMessage>? Updated;
+    
+    public ServerStats Stats { get; } = new ServerStats();
 
     /// <summary>
     /// Создаёт сервер
@@ -77,6 +80,8 @@ public sealed class EventServer : IGameServer
     /// </summary>
     private void Run()
     {
+        Stats.OnThreadStart();
+        
         // Когда очередь пуста, поток спит: в этом отличие от циклического сервера,
         // который просыпается по таймеру независимо от наличия команд
         foreach (var message in _incoming.GetConsumingEnumerable())
@@ -92,6 +97,8 @@ public sealed class EventServer : IGameServer
     /// </exception>
     private void Process(ClientMessage message)
     {
+        long started = Stopwatch.GetTimestamp();
+        
         if (!_games.TryGetValue(message.GameId, out var state))
             throw new InvalidOperationException($"Unknown game {message.GameId}");
 
@@ -103,6 +110,8 @@ public sealed class EventServer : IGameServer
             message.SentAt,
             result.Error,
             result.Changes));
+        
+        Stats.AddBusy(started);
     }
 
     /// <summary>

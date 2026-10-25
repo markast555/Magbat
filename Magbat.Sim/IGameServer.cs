@@ -35,4 +35,9 @@ public interface IGameServer : IDisposable
     /// </summary>
     /// <remarks>Подписчики вызываются в потоке сервера, поэтому должны работать быстро</remarks>
     event Action<ServerMessage>? Updated;
+    
+    /// <summary>
+    /// Статистика потока сервера
+    /// </summary>
+    ServerStats Stats { get; }
 }

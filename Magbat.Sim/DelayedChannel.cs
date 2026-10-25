@@ -18,14 +18,14 @@ public sealed class DelayedChannel<T> : IDisposable
     private long _messages;
 
     /// <summary>
-    /// Суммарный размер доставленных сообщений, байт. Читать после Dispose
+    /// Суммарный размер доставленных сообщений, байт
     /// </summary>
-    public long BytesDelivered => _bytes;
+    public long BytesDelivered => Volatile.Read(ref _bytes);
 
     /// <summary>
-    /// Число доставленных сообщений. Читать после Dispose
+    /// Число доставленных сообщений
     /// </summary>
-    public long MessagesDelivered => _messages;
+    public long MessagesDelivered => Volatile.Read(ref _messages);
 
     /// <summary>
     /// Создаёт канал и запускает поток доставки
