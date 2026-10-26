@@ -17,7 +17,9 @@ public sealed class ExperimentResult
         double busyPct = m.ServerBusyMs / elapsedMs * 100;
         double? cpuPct = m.ServerCpuMs / elapsedMs * 100;
         double bytesPerSec = (m.UpBytes + m.DownBytes) / m.ElapsedSec;
-
+        double? busyPerCmd = m.UpMessages > 0 ? m.ServerBusyMs / m.UpMessages : null;
+        double? bytesPerCmd = m.UpMessages > 0 ? (double)(m.UpBytes + m.DownBytes) / m.UpMessages : null;
+        
         Columns = new List<(string, object?)>
         {
             ("started_at", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")),
@@ -45,6 +47,8 @@ public sealed class ExperimentResult
             ("up_bytes", m.UpBytes),
             ("down_bytes", m.DownBytes),
             ("traffic_bytes_per_s", bytesPerSec),
+            ("busy_ms_per_cmd", busyPerCmd),
+            ("bytes_per_cmd", bytesPerCmd),
             ("server_alloc_mb", m.ServerAllocatedBytes / 1048576.0),
             ("gc0", m.Gc0),
             ("gc1", m.Gc1),
