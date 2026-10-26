@@ -13,6 +13,8 @@ public static class CsvWriter
 
     public static void Append(string path, ExperimentResult result)
     {
+        Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(path))!);
+        
         bool isNew = !File.Exists(path);
         using var writer = new StreamWriter(path, true, new UTF8Encoding(true));
 
