@@ -1,42 +1,38 @@
-﻿using Magbat.Core;
-using Magbat.Sim;
-using System.Diagnostics;
+﻿using Magbat.Sim;
 
-var rules = new GameRules();
+const int Repeats = 3;
+const int DurationSec = 15;
+string OutputPath = $"results_{DateTime.Now:yyyyMMdd_HHmm}.csv";
 
-GameResult Run(int seed) => GameRunner.Play(
-    GameFactory.NewGame(), rules,
-    new[] { RandomBot.ForGame(seed, 0), RandomBot.ForGame(seed, 1) });
+Console.WriteLine("Warm-up...");
+ExperimentRunner.Warmup();
 
-// проверка воспроизводимости: один и тот же seed даёт одну и ту же партию
-var a = Run(1);
-var b = Run(1);
-Console.WriteLine($"Reproducible: {a.Winner == b.Winner && a.Turns == b.Turns}");
-
-int won = 0, limit = 0;
-long totalTurns = 0;
-for (int seed = 1; seed <= 1000; seed++)
+// Повторы снаружи: если прервать серию, у всех конфигураций будет поровну прогонов
+var configs = new List<ExperimentConfig>();
+for (int repeat = 0; repeat < Repeats; repeat++)
 {
-    var result = Run(seed);
-    totalTurns += result.Turns;
-    if (result.HitTurnLimit) limit++; else won++;
+    foreach (int games in new[] { 1, 10, 100 })
+    {
+        foreach (int think in new[] { 500, 3000 })
+        {
+            foreach (var (kind, hz, mode) in ExperimentRunner.Servers)
+            {
+                configs.Add(new ExperimentConfig
+                {
+                    Server = kind, TickHz = hz, Mode = mode,
+                    Games = games, MeanThinkMs = think, DelayMs = 0,
+                    DurationSec = DurationSec, Repeat = repeat
+                });
+            }
+        }
+    }
 }
-Console.WriteLine($"Finished with winner: {won}, hit turn limit: {limit}, average turns: {totalTurns / 1000.0:F1}");
 
-using var simulationEventServer = new GameSimulation(new EventServer(rules), rules, delayMs: 0);
-var watch = Stopwatch.StartNew();
-var simulationResult = simulationEventServer.Run(Enumerable.Range(1, 1000).ToList(), TimeSpan.FromMinutes(2));
-Console.WriteLine($"EventServer: {simulationResult.ServerStates.Count} games in {watch.Elapsed.TotalSeconds:F1} s, " +
-                  $"average latency {simulationResult.LatenciesMs.Average():F3} ms");
-
-foreach (var (hz, mode) in new[] { (30, BroadcastMode.Delta), (30, BroadcastMode.FullSnapshot), (10, BroadcastMode.Delta) })
+int number = 0;
+foreach (var config in configs)
 {
-    var server = new TickServer(rules, hz, mode);
-    var simulationTickServer = new GameSimulation(server, rules, 0);
-    var result = simulationTickServer.Run(Enumerable.Range(1, 1000).ToList(), TimeSpan.FromMinutes(3));
-    simulationTickServer.Dispose();
-
-    Console.WriteLine($"TickServer {hz} Hz {mode}: average latency {result.LatenciesMs.Average():F1} ms, " +
-                      $"ticks {server.Ticks} (idle {server.IdleTicks}), " +
-                      $"interval mean {server.MeanIntervalMs:F1} / min {server.MinIntervalMs:F1} / max {server.MaxIntervalMs:F1} ms");
-}                  
+    number++;
+    var result = ExperimentRunner.Execute(config);
+    CsvWriter.Append(OutputPath, result);
+    Console.WriteLine($"[{number}/{configs.Count}] {result.Summary}");
+}
