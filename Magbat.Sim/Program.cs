@@ -5,7 +5,8 @@ string Label((ServerKind Kind, int Hz, BroadcastMode Mode) s) =>
 
 Console.WriteLine("Параметры серии. Enter оставляет значение в скобках.");
 
-int repeats = ConsoleInput.AskInt("Число повторов", 3, 1);
+int repeats = ConsoleInput.AskInt("Число повторов", 5, 1);
+int firstRepeat = ConsoleInput.AskInt("Номер первого повтора (0, если серия новая)", 0, 0);
 int durationSec = ConsoleInput.AskInt("Длительность одного прогона, с", 15, 1);
 var gamesList = ConsoleInput.AskIntList("Число одновременных партий", new[] { 1, 10, 100 }, 1);
 var thinkList = ConsoleInput.AskIntList("Средняя пауза бота, мс (0 = без пауз)", new[] { 500, 3000 }, 0);
@@ -19,7 +20,7 @@ var picked = ConsoleInput.AskIndices("Какие запускать", servers.Le
 
 // Повторы снаружи: если серию прервать, у всех конфигураций будет поровну прогонов
 var configs = new List<ExperimentConfig>();
-for (int repeat = 0; repeat < repeats; repeat++)
+for (int repeat = firstRepeat; repeat < firstRepeat + repeats; repeat++)
 foreach (int games in gamesList)
 foreach (int think in thinkList)
 foreach (int delay in delayList)
